@@ -77,7 +77,7 @@ npm run dev               # 打开 http://localhost:5173
 
 接入真实模型：打开界面左下角的**设置**，在“模型接入”里选择“OpenAI 兼容接口”，填写接口地址、模型名称和密钥，保存后点“测试连接”。保存后立即生效，不需要重启。
 
-- 接口地址填到 `/v1` 这一级。程序调用的是 `POST {接口地址}/chat/completions`。
+- 接口地址填服务商文档里的 base_url，程序调用的是 `POST {接口地址}/chat/completions`。有的服务商要求地址以 `/v1` 结尾，有的不要，以它的文档为准。
 - 私有化部署时把接口地址指向内网的推理服务即可，本地服务没有密钥时可以留空。
 - 也可以在 `.env` 里用 `LLM_PROVIDER`、`LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 预置。设置页保存过之后，以设置页的为准。
 - 接口格式不同的模型服务需要在 `backend/app/llm/providers.py` 里新增一个提供方。
