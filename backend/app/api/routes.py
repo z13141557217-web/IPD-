@@ -60,6 +60,23 @@ def create_project(body: schemas.ProjectCreate, db: Session = Depends(get_db)) -
     return project
 
 
+@router.patch("/projects/{project_id}", response_model=schemas.ProjectOut)
+def update_project(
+    project_id: int, body: schemas.ProjectUpdate, db: Session = Depends(get_db)
+) -> Project:
+    project: Project = _get_or_404(db, Project, project_id, "项目")
+    changes = body.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        if value is None:
+            raise HTTPException(status_code=422, detail=f"{field} 不能为空")
+        setattr(project, field, value.strip())
+    if not project.name:
+        raise HTTPException(status_code=422, detail="项目名称不能为空")
+    db.commit()
+    db.refresh(project)
+    return project
+
+
 # ---- 原始材料与提取 ----
 
 
@@ -147,6 +164,8 @@ def update_requirement(
     for field in changes:
         if field != "appeals" and changes[field] is None:
             raise HTTPException(status_code=422, detail=f"{field} 不能为空")
+    if "open_questions" in changes:
+        changes["open_questions"] = [q.strip() for q in changes["open_questions"] if q.strip()]
     for field, value in changes.items():
         setattr(requirement, field, value.strip() if field == "title" else value)
     # 潜在需求是假设。没有向客户验证成立之前不能当作正式需求，否则就成了自己想当然。

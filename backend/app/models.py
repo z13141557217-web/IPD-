@@ -63,6 +63,10 @@ class Requirement(Base):
     # stated 客户明确提出的诉求，经分析还原出真实需求
     # latent 客户没有明说、由多条需求推断出的潜在需求假设
     kind: Mapped[str] = mapped_column(String(20), default="stated", server_default="stated")
+    # 需求类型：strategic 关系到客户中长期经营方向的需求，会持续存在
+    #          project   针对某一次交付或某个具体项目的个别要求
+    #          unknown   材料不足以判断
+    demand_type: Mapped[str] = mapped_column(String(20), default="unknown", server_default="unknown")
     # 客户表面上提的要求（常常是一个具体方案）。title/description 写的是分析后的真实需求。
     stated_request: Mapped[str] = mapped_column(Text, default="", server_default="")
     # 客户提这个要求，背后真正要解决的问题。

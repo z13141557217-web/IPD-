@@ -3,6 +3,8 @@ export type RequirementStatus = "draft" | "confirmed" | "rejected";
 export type RequirementKind = "stated" | "latent";
 export type Confidence = "high" | "medium" | "low";
 export type ValidationStatus = "unverified" | "validated" | "invalidated";
+/** strategic：客户中长期的需求；project：某一次项目的个别要求 */
+export type DemandType = "strategic" | "project" | "unknown";
 
 export interface Health {
   status: string;
@@ -40,6 +42,7 @@ export interface Requirement {
   priority_reason: string;
   /** stated：客户明确提出的诉求；latent：客户没有明说的潜在需求假设 */
   kind: RequirementKind;
+  demand_type: DemandType;
   stated_request: string;
   underlying_problem: string;
   reasoning: string;
@@ -76,7 +79,14 @@ export interface AppealsRules {
 export type RequirementPatch = Partial<
   Pick<
     Requirement,
-    "title" | "description" | "appeals" | "priority" | "status" | "validation_status"
+    | "title"
+    | "description"
+    | "appeals"
+    | "priority"
+    | "status"
+    | "validation_status"
+    | "demand_type"
+    | "open_questions"
   >
 >;
 
@@ -109,6 +119,8 @@ export const api = {
   listProjects: () => request<Project[]>("/projects"),
   createProject: (name: string) =>
     request<Project>("/projects", { method: "POST", body: JSON.stringify({ name }) }),
+  updateProject: (id: number, patch: Partial<Pick<Project, "name" | "description">>) =>
+    request<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   listRequirements: (projectId: number) =>
     request<Requirement[]>(`/projects/${projectId}/requirements`),
   listInputs: (projectId: number) => request<RawInput[]>(`/projects/${projectId}/inputs`),

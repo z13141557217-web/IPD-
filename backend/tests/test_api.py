@@ -67,7 +67,7 @@ def test_llm_call_is_logged_with_prompt_and_response(client):
     client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL})
     [call] = client.get(f"/api/projects/{pid}/llm-calls").json()
     assert call["task"] == "extract_requirements"
-    assert call["prompt_version"] == "v2"
+    assert call["prompt_version"] == "v3"
     assert call["provider"] == "mock"
     assert MATERIAL in call["request"]["user"]
     assert call["response"] and call["error"] is None
@@ -142,3 +142,51 @@ def test_missing_resources_return_404_and_blank_input_422(client):
     pid = _project(client)
     assert client.post(f"/api/projects/{pid}/inputs", json={"content": "   "}).status_code == 422
     assert client.post("/api/projects", json={"name": ""}).status_code == 422
+
+
+def test_project_background_is_saved_and_sent_to_the_model(client):
+    pid = _project(client)
+    background = "客户是连锁公寓运营商，一个管家负责两百间房的门锁。"
+    resp = client.patch(f"/api/projects/{pid}", json={"description": f"  {background}  "})
+    assert resp.status_code == 200
+    assert resp.json()["description"] == background
+    assert resp.json()["name"] == "测试产品"  # 没传的字段不变
+
+    client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL})
+    [call] = client.get(f"/api/projects/{pid}/llm-calls").json()
+    prompt = call["request"]["user"]
+    assert background in prompt.split("</项目背景>")[0]
+    assert background not in prompt.split("<材料")[1]  # 背景不混进材料，不能被当作原话引用
+
+
+def test_empty_background_is_marked_as_missing_in_prompt(client):
+    pid = _project(client)
+    client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL})
+    [call] = client.get(f"/api/projects/{pid}/llm-calls").json()
+    assert "（未填写）" in call["request"]["user"].split("</项目背景>")[0]
+
+
+def test_project_update_validation(client):
+    pid = _project(client)
+    assert client.patch(f"/api/projects/{pid}", json={"name": "  "}).status_code == 422
+    assert client.patch(f"/api/projects/{pid}", json={"description": None}).status_code == 422
+    assert client.patch("/api/projects/999", json={"name": "x"}).status_code == 404
+    renamed = client.patch(f"/api/projects/{pid}", json={"name": " 新名字 "})
+    assert renamed.json()["name"] == "新名字"
+
+
+def test_open_questions_and_demand_type_can_be_updated(client):
+    pid = _project(client)
+    rid = client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL}).json()[
+        "requirements"
+    ][0]["id"]
+    resp = client.patch(
+        f"/api/requirements/{rid}",
+        json={"open_questions": ["一天开机几次？", "  "], "demand_type": "strategic"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["open_questions"] == ["一天开机几次？"]
+    assert resp.json()["demand_type"] == "strategic"
+    cleared = client.patch(f"/api/requirements/{rid}", json={"open_questions": []})
+    assert cleared.json()["open_questions"] == []
+    assert client.patch(f"/api/requirements/{rid}", json={"demand_type": "x"}).status_code == 422

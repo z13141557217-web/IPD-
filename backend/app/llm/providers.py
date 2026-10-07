@@ -114,6 +114,7 @@ class MockProvider:
                     "underlying_problem": "",
                     "reasoning": "演示模式不做需求分析，标题只是原话的截取。",
                     "confidence": "low",
+                    "demand_type": "unknown",
                     "open_questions": [],
                     "source_quote": s,
                     "appeals": appeals,

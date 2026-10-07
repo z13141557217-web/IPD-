@@ -111,3 +111,13 @@ def test_missing_or_invalid_confidence_is_treated_as_low(confidence):
     text = _wrap([{"title": "x", "confidence": confidence}])
     [req] = parse_extraction(text, content=CONTENT, existing_ids=set())
     assert req["confidence"] == "low"
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [("strategic", "strategic"), ("project", "project"), (None, "unknown"), ("长期", "unknown")],
+)
+def test_demand_type_defaults_to_unknown(given, expected):
+    text = _wrap([{"title": "x", "demand_type": given}])
+    [req] = parse_extraction(text, content=CONTENT, existing_ids=set())
+    assert req["demand_type"] == expected

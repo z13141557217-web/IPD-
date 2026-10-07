@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 RequirementStatus = Literal["draft", "confirmed", "rejected"]
 Priority = Literal["high", "medium", "low"]
 ValidationStatus = Literal["unverified", "validated", "invalidated"]
+DemandType = Literal["strategic", "project", "unknown"]
 
 
 class ORMModel(BaseModel):
@@ -15,6 +16,12 @@ class ORMModel(BaseModel):
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = ""
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    # 客户背景：客户是谁、什么行业、用产品做什么。每次分析都会带上。
+    description: str | None = Field(default=None, max_length=5000)
 
 
 class ProjectOut(ORMModel):
@@ -52,6 +59,7 @@ class RequirementOut(ORMModel):
     priority: str
     priority_reason: str
     kind: str
+    demand_type: str
     stated_request: str
     underlying_problem: str
     reasoning: str
@@ -75,6 +83,9 @@ class RequirementUpdate(BaseModel):
     underlying_problem: str | None = None
     validation_plan: str | None = None
     validation_status: ValidationStatus | None = None
+    demand_type: DemandType | None = None
+    # 追问清单：问到答案后把对应的问题去掉。
+    open_questions: list[str] | None = Field(default=None, max_length=20)
 
 
 class ExtractionResult(BaseModel):
