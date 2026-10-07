@@ -1,9 +1,26 @@
 import { useState } from "react";
 
-import type { AppealsDimension, Priority, Requirement, RequirementPatch } from "./api";
+import type {
+  AppealsDimension,
+  Confidence,
+  Priority,
+  Requirement,
+  RequirementPatch,
+  ValidationStatus,
+} from "./api";
 
 const PRIORITY_LABEL: Record<Priority, string> = { high: "高", medium: "中", low: "低" };
 const STATUS_LABEL = { draft: "待确认", confirmed: "已确认", rejected: "已否决" } as const;
+const CONFIDENCE_LABEL: Record<Confidence, string> = {
+  high: "把握高：材料直接说明了原因",
+  medium: "把握中：有线索，含推断",
+  low: "把握低：材料信息不足，主要是推测",
+};
+const VALIDATION_LABEL: Record<ValidationStatus, string> = {
+  unverified: "未验证",
+  validated: "已验证成立",
+  invalidated: "验证不成立",
+};
 
 interface Props {
   requirement: Requirement;
@@ -16,6 +33,9 @@ export default function RequirementCard({ requirement: r, dimensions, onUpdate }
   const [title, setTitle] = useState(r.title);
   const [description, setDescription] = useState(r.description);
   const [saving, setSaving] = useState(false);
+
+  const isLatent = r.kind === "latent";
+  const needsValidation = isLatent && r.validation_status !== "validated";
 
   async function update(patch: RequirementPatch) {
     setSaving(true);
@@ -39,7 +59,7 @@ export default function RequirementCard({ requirement: r, dimensions, onUpdate }
   }
 
   return (
-    <article className={`req req-${r.status}`}>
+    <article className={`req req-${r.status} ${isLatent ? "req-latent" : ""}`}>
       <header className="req-head">
         <span className="req-id">#{r.id}</span>
         {editing ? (
@@ -53,6 +73,7 @@ export default function RequirementCard({ requirement: r, dimensions, onUpdate }
         ) : (
           <h3 className="req-title">{r.title}</h3>
         )}
+        {isLatent && <span className="badge badge-latent">潜在需求假设</span>}
         <span className={`badge badge-${r.status}`}>{STATUS_LABEL[r.status]}</span>
       </header>
 
@@ -72,15 +93,82 @@ export default function RequirementCard({ requirement: r, dimensions, onUpdate }
         <p className="req-note req-note-warn">可能与 #{r.duplicate_of_id} 重复，请核对后决定是否否决。</p>
       )}
 
-      <blockquote className="req-quote">
-        <span className="req-quote-label">依据原文</span>
-        {r.source_quote ? `“${r.source_quote}”` : "模型没有给出原文依据。"}
-        {r.source_quote && (
-          <span className={r.quote_verified ? "verify verify-ok" : "verify verify-bad"}>
-            {r.quote_verified ? "已在材料中找到" : "材料中找不到这句话，可能是模型改写或编造"}
-          </span>
-        )}
-      </blockquote>
+      {isLatent ? (
+        <dl className="analysis">
+          <div>
+            <dt>依据的需求</dt>
+            <dd>{r.based_on.map((id) => `#${id}`).join("、")}</dd>
+          </div>
+          {r.reasoning && (
+            <div>
+              <dt>推理过程</dt>
+              <dd>{r.reasoning}</dd>
+            </div>
+          )}
+          {r.validation_plan && (
+            <div>
+              <dt>建议的验证方式</dt>
+              <dd>{r.validation_plan}</dd>
+            </div>
+          )}
+          <div>
+            <dt>验证状态</dt>
+            <dd className={`validation validation-${r.validation_status}`}>
+              {VALIDATION_LABEL[r.validation_status]}
+              {r.validation_status === "unverified" &&
+                "。这是从已有需求推断出来的，客户并没有提过，验证成立后才能确认。"}
+            </dd>
+          </div>
+        </dl>
+      ) : (
+        <>
+          <dl className="analysis">
+            {r.stated_request && (
+              <div>
+                <dt>客户的表面诉求</dt>
+                <dd>{r.stated_request}</dd>
+              </div>
+            )}
+            {r.underlying_problem && (
+              <div>
+                <dt>背后要解决的问题</dt>
+                <dd>{r.underlying_problem}</dd>
+              </div>
+            )}
+            {r.reasoning && (
+              <div>
+                <dt>推理过程</dt>
+                <dd>
+                  {r.reasoning}
+                  <span className={`confidence confidence-${r.confidence}`}>
+                    {CONFIDENCE_LABEL[r.confidence]}
+                  </span>
+                </dd>
+              </div>
+            )}
+          </dl>
+          <blockquote className="req-quote">
+            <span className="req-quote-label">依据原文</span>
+            {r.source_quote ? `“${r.source_quote}”` : "模型没有给出原文依据。"}
+            {r.source_quote && (
+              <span className={r.quote_verified ? "verify verify-ok" : "verify verify-bad"}>
+                {r.quote_verified ? "已在材料中找到" : "材料中找不到这句话，可能是模型改写或编造"}
+              </span>
+            )}
+          </blockquote>
+        </>
+      )}
+
+      {r.open_questions.length > 0 && (
+        <div className="questions">
+          <span className="questions-label">待向客户追问</span>
+          <ul>
+            {r.open_questions.map((q) => (
+              <li key={q}>{q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="req-fields">
         <label>
@@ -127,7 +215,25 @@ export default function RequirementCard({ requirement: r, dimensions, onUpdate }
           </>
         ) : (
           <>
-            {r.status !== "confirmed" && (
+            {isLatent && r.validation_status === "unverified" && r.status === "draft" && (
+              <>
+                <button
+                  className="btn btn-primary"
+                  disabled={saving}
+                  onClick={() => update({ validation_status: "validated" })}
+                >
+                  已向客户验证，成立
+                </button>
+                <button
+                  className="btn"
+                  disabled={saving}
+                  onClick={() => update({ validation_status: "invalidated", status: "rejected" })}
+                >
+                  验证不成立
+                </button>
+              </>
+            )}
+            {r.status !== "confirmed" && !needsValidation && (
               <button
                 className="btn btn-primary"
                 disabled={saving}
@@ -142,7 +248,17 @@ export default function RequirementCard({ requirement: r, dimensions, onUpdate }
               </button>
             )}
             {r.status !== "draft" && (
-              <button className="btn" disabled={saving} onClick={() => update({ status: "draft" })}>
+              <button
+                className="btn"
+                disabled={saving}
+                onClick={() =>
+                  update(
+                    isLatent && r.validation_status === "invalidated"
+                      ? { status: "draft", validation_status: "unverified" }
+                      : { status: "draft" },
+                  )
+                }
+              >
                 退回待确认
               </button>
             )}

@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 RequirementStatus = Literal["draft", "confirmed", "rejected"]
 Priority = Literal["high", "medium", "low"]
+ValidationStatus = Literal["unverified", "validated", "invalidated"]
 
 
 class ORMModel(BaseModel):
@@ -50,6 +51,15 @@ class RequirementOut(ORMModel):
     appeals: str | None
     priority: str
     priority_reason: str
+    kind: str
+    stated_request: str
+    underlying_problem: str
+    reasoning: str
+    confidence: str
+    open_questions: list[str]
+    based_on: list[int]
+    validation_plan: str
+    validation_status: str
     status: str
     duplicate_of_id: int | None
     created_at: datetime
@@ -62,11 +72,19 @@ class RequirementUpdate(BaseModel):
     appeals: str | None = None
     priority: Priority | None = None
     status: RequirementStatus | None = None
+    underlying_problem: str | None = None
+    validation_plan: str | None = None
+    validation_status: ValidationStatus | None = None
 
 
 class ExtractionResult(BaseModel):
     input: RawInputOut
     requirements: list[RequirementOut]
+
+
+class LatentNeedsResult(BaseModel):
+    requirements: list[RequirementOut]
+    dropped_without_basis: int
 
 
 class LLMCallOut(ORMModel):

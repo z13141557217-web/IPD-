@@ -41,6 +41,7 @@ export default function App() {
 
   const [statusFilter, setStatusFilter] = useState<RequirementStatus | "all">("all");
   const [appealsFilter, setAppealsFilter] = useState("all");
+  const [kindFilter, setKindFilter] = useState<"all" | "stated" | "latent">("all");
 
   useEffect(() => {
     Promise.all([api.health(), api.appeals(), api.listProjects()])
@@ -123,6 +124,33 @@ export default function App() {
     );
   }
 
+  async function discoverLatentNeeds() {
+    if (projectId === null) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await api.discoverLatentNeeds(projectId);
+      const n = result.requirements.length;
+      const dropped = result.dropped_without_basis;
+      const droppedNote = dropped > 0 ? `另有 ${dropped} 条因为给不出依据被丢弃。` : "";
+      if (n > 0) {
+        setNotice(`提出了 ${n} 条潜在需求假设，需要向客户验证后才能确认。${droppedNote}`);
+        setKindFilter("latent");
+        setStatusFilter("all");
+      } else if (health?.demo_mode) {
+        setNotice("演示模式无法分析潜在需求，这一步需要接入大模型。");
+      } else {
+        setNotice(`现有需求不足以支撑新的潜在需求假设。${droppedNote}`);
+      }
+      await loadProjectData(projectId);
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function updateRequirement(id: number, patch: RequirementPatch) {
     setError(null);
     try {
@@ -133,19 +161,21 @@ export default function App() {
     }
   }
 
-  const visible = useMemo(
+  // 类型和维度筛选后的结果；状态页签上的数字也按它来算，和列表保持一致。
+  const scoped = useMemo(
     () =>
       requirements.filter(
         (r) =>
-          (statusFilter === "all" || r.status === statusFilter) &&
+          (kindFilter === "all" || r.kind === kindFilter) &&
           (appealsFilter === "all" ||
             (appealsFilter === "none" ? r.appeals === null : r.appeals === appealsFilter)),
       ),
-    [requirements, statusFilter, appealsFilter],
+    [requirements, appealsFilter, kindFilter],
   );
+  const visible = scoped.filter((r) => statusFilter === "all" || r.status === statusFilter);
 
   const countByStatus = (key: RequirementStatus | "all") =>
-    key === "all" ? requirements.length : requirements.filter((r) => r.status === key).length;
+    key === "all" ? scoped.length : scoped.filter((r) => r.status === key).length;
 
   return (
     <div className="layout">
@@ -260,6 +290,27 @@ export default function App() {
             <section className="card">
               <div className="list-head">
                 <h2>需求列表</h2>
+                <button
+                  className="btn"
+                  disabled={busy}
+                  title="从已有需求的共性中，找出客户没有明说的潜在需求"
+                  onClick={() => void discoverLatentNeeds()}
+                >
+                  {busy ? "分析中…" : "发现潜在需求"}
+                </button>
+              </div>
+              <div className="filters">
+                <label className="field field-inline">
+                  类型
+                  <select
+                    value={kindFilter}
+                    onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
+                  >
+                    <option value="all">全部类型</option>
+                    <option value="stated">客户提出的需求</option>
+                    <option value="latent">潜在需求假设</option>
+                  </select>
+                </label>
                 <label className="field field-inline">
                   维度
                   <select value={appealsFilter} onChange={(e) => setAppealsFilter(e.target.value)}>

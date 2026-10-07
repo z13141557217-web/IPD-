@@ -10,7 +10,10 @@ from app.db import get_db
 from app.llm.gateway import LLMGateway, get_gateway
 from app.models import LLMCall, Project, RawInput, Requirement
 from app.rules import appeals_keys, load_appeals
+from app.llm.providers import LLMError
 from app.services.extraction import extract_requirements
+from app.services.latent import NotEnoughRequirements, discover_latent_needs
+from app.services.parsing import ModelOutputError
 
 router = APIRouter(prefix="/api")
 
@@ -141,14 +144,42 @@ def update_requirement(
     changes = body.model_dump(exclude_unset=True)
     if "appeals" in changes and changes["appeals"] is not None and changes["appeals"] not in appeals_keys():
         raise HTTPException(status_code=422, detail="不认识的 $APPEALS 维度")
-    for field in ("title", "description", "priority", "status"):
-        if field in changes and changes[field] is None:
+    for field in changes:
+        if field != "appeals" and changes[field] is None:
             raise HTTPException(status_code=422, detail=f"{field} 不能为空")
     for field, value in changes.items():
         setattr(requirement, field, value.strip() if field == "title" else value)
+    # 潜在需求是假设。没有向客户验证成立之前不能当作正式需求，否则就成了自己想当然。
+    if (
+        requirement.kind == "latent"
+        and requirement.status == "confirmed"
+        and requirement.validation_status != "validated"
+    ):
+        db.rollback()
+        raise HTTPException(status_code=422, detail="潜在需求必须先向客户验证成立，才能确认")
     db.commit()
     db.refresh(requirement)
     return requirement
+
+
+@router.post("/projects/{project_id}/latent-needs", response_model=schemas.LatentNeedsResult)
+def discover_latent(
+    project_id: int,
+    db: Session = Depends(get_db),
+    gateway: LLMGateway = Depends(get_gateway),
+) -> schemas.LatentNeedsResult:
+    """基于项目中已有的客户需求，提出客户没有明说的潜在需求假设。"""
+    _get_or_404(db, Project, project_id, "项目")
+    try:
+        result = discover_latent_needs(db, gateway, project_id, get_settings().default_user)
+    except NotEnoughRequirements as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (LLMError, ModelOutputError) as exc:
+        raise HTTPException(status_code=502, detail=f"分析失败：{exc}") from exc
+    return schemas.LatentNeedsResult(
+        requirements=[schemas.RequirementOut.model_validate(r) for r in result.requirements],
+        dropped_without_basis=result.dropped_without_basis,
+    )
 
 
 # ---- 模型调用记录 ----

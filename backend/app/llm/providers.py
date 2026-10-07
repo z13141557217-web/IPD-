@@ -87,6 +87,9 @@ class MockProvider:
     model = "mock-rules-v1"
 
     def complete(self, system: str, user: str) -> str:
+        if "<需求清单>" in user:
+            # 发现潜在需求需要真正的推理，规则做不到，演示模式下如实返回空。
+            return json.dumps({"hypotheses": []})
         material = _between(user, "<材料", "</材料>")
         material = material.split(">", 1)[1] if ">" in material else material
         existing_raw = _between(user, "<已有需求>", "</已有需求>").removeprefix("<已有需求>")
@@ -107,6 +110,11 @@ class MockProvider:
                 {
                     "title": title,
                     "description": s,
+                    "stated_request": s,
+                    "underlying_problem": "",
+                    "reasoning": "演示模式不做需求分析，标题只是原话的截取。",
+                    "confidence": "low",
+                    "open_questions": [],
                     "source_quote": s,
                     "appeals": appeals,
                     "priority": "medium",

@@ -59,7 +59,31 @@ class Requirement(Base):
     priority: Mapped[str] = mapped_column(String(10), default="medium")
     priority_reason: Mapped[str] = mapped_column(Text, default="")
 
+    # ---- 需求分析（挖掘本质与潜在需求）----
+    # stated 客户明确提出的诉求，经分析还原出真实需求
+    # latent 客户没有明说、由多条需求推断出的潜在需求假设
+    kind: Mapped[str] = mapped_column(String(20), default="stated", server_default="stated")
+    # 客户表面上提的要求（常常是一个具体方案）。title/description 写的是分析后的真实需求。
+    stated_request: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # 客户提这个要求，背后真正要解决的问题。
+    underlying_problem: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # 从依据推到真实需求（或潜在需求）的推理过程，供人判断推得对不对。
+    reasoning: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # 模型对这条推断的把握：high / medium / low
+    confidence: Mapped[str] = mapped_column(String(10), default="low", server_default="low")
+    # 需要回头向客户追问、用来证实或推翻这条推断的问题。
+    open_questions: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    # 仅 latent：这条假设依据的是哪些已有需求（id 列表）。没有依据的假设不允许入库。
+    based_on: Mapped[list[int]] = mapped_column(JSON, default=list, server_default="[]")
+    # 仅 latent：建议的验证方式。
+    validation_plan: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # unverified 未验证 / validated 已向客户验证成立 / invalidated 验证不成立
+    validation_status: Mapped[str] = mapped_column(
+        String(20), default="unverified", server_default="unverified"
+    )
+
     # draft 模型给出、待人确认 / confirmed 已确认 / rejected 已否决
+    # latent 类型的需求必须先验证成立才能确认。
     status: Mapped[str] = mapped_column(String(20), default="draft")
     duplicate_of_id: Mapped[int | None] = mapped_column(
         ForeignKey("requirements.id", ondelete="SET NULL"), nullable=True

@@ -82,3 +82,32 @@ def test_items_without_title_or_of_wrong_type_are_skipped():
 def test_unusable_output_raises(text):
     with pytest.raises(ExtractionError):
         parse_extraction(text, content=CONTENT, existing_ids=set())
+
+
+def test_analysis_fields_are_kept():
+    text = _wrap(
+        [
+            {
+                "stated_request": "希望开机快一点",
+                "source_quote": "设备开机太慢，要等两分钟。",
+                "underlying_problem": "巡检时每到一处都要重新开机，累计等待很长",
+                "title": "巡检途中无需等待即可使用",
+                "reasoning": "材料提到要等两分钟，但没有说明使用场景",
+                "confidence": "medium",
+                "open_questions": ["一天要开机多少次？", "  ", 3],
+            }
+        ]
+    )
+    [req] = parse_extraction(text, content=CONTENT, existing_ids=set())
+    assert req["kind"] == "stated"
+    assert req["stated_request"] == "希望开机快一点"
+    assert req["underlying_problem"].startswith("巡检时")
+    assert req["confidence"] == "medium"
+    assert req["open_questions"] == ["一天要开机多少次？"]
+
+
+@pytest.mark.parametrize("confidence", [None, "very high", 5])
+def test_missing_or_invalid_confidence_is_treated_as_low(confidence):
+    text = _wrap([{"title": "x", "confidence": confidence}])
+    [req] = parse_extraction(text, content=CONTENT, existing_ids=set())
+    assert req["confidence"] == "low"

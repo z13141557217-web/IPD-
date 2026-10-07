@@ -1,5 +1,8 @@
 export type Priority = "high" | "medium" | "low";
 export type RequirementStatus = "draft" | "confirmed" | "rejected";
+export type RequirementKind = "stated" | "latent";
+export type Confidence = "high" | "medium" | "low";
+export type ValidationStatus = "unverified" | "validated" | "invalidated";
 
 export interface Health {
   status: string;
@@ -35,8 +38,23 @@ export interface Requirement {
   appeals: string | null;
   priority: Priority;
   priority_reason: string;
+  /** stated：客户明确提出的诉求；latent：客户没有明说的潜在需求假设 */
+  kind: RequirementKind;
+  stated_request: string;
+  underlying_problem: string;
+  reasoning: string;
+  confidence: Confidence;
+  open_questions: string[];
+  based_on: number[];
+  validation_plan: string;
+  validation_status: ValidationStatus;
   status: RequirementStatus;
   duplicate_of_id: number | null;
+}
+
+export interface LatentNeedsResult {
+  requirements: Requirement[];
+  dropped_without_basis: number;
 }
 
 export interface ExtractionResult {
@@ -56,7 +74,10 @@ export interface AppealsRules {
 }
 
 export type RequirementPatch = Partial<
-  Pick<Requirement, "title" | "description" | "appeals" | "priority" | "status">
+  Pick<
+    Requirement,
+    "title" | "description" | "appeals" | "priority" | "status" | "validation_status"
+  >
 >;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -98,6 +119,8 @@ export const api = {
     }),
   retryExtraction: (inputId: number) =>
     request<ExtractionResult>(`/inputs/${inputId}/extract`, { method: "POST" }),
+  discoverLatentNeeds: (projectId: number) =>
+    request<LatentNeedsResult>(`/projects/${projectId}/latent-needs`, { method: "POST" }),
   updateRequirement: (id: number, patch: RequirementPatch) =>
     request<Requirement>(`/requirements/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 };

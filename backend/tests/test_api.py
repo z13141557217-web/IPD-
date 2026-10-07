@@ -67,7 +67,7 @@ def test_llm_call_is_logged_with_prompt_and_response(client):
     client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL})
     [call] = client.get(f"/api/projects/{pid}/llm-calls").json()
     assert call["task"] == "extract_requirements"
-    assert call["prompt_version"] == "v1"
+    assert call["prompt_version"] == "v2"
     assert call["provider"] == "mock"
     assert MATERIAL in call["request"]["user"]
     assert call["response"] and call["error"] is None
