@@ -147,10 +147,13 @@ export default function SettingsPage({ onSaved }: Props) {
                   id="llm-base-url"
                   value={baseUrl}
                   maxLength={500}
-                  placeholder="https://模型服务的域名/v1"
+                  placeholder="https://模型服务的域名"
                   onChange={(e) => setBaseUrl(e.target.value)}
                 />
-                <small>填到 /v1 这一级，不要带 /chat/completions。具体地址见模型服务商的接口文档。</small>
+                <small>
+                  填服务商文档里的 base_url，不要带 /chat/completions，程序会自动加上。有的服务商要求以 /v1
+                  结尾，有的不要，以它的文档为准。
+                </small>
               </label>
               <label className="setting">
                 模型名称
