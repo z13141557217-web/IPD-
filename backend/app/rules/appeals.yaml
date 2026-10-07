@@ -1,0 +1,45 @@
+# $APPEALS 客户需求分析维度。
+# 这是规则数据：改这里即可调整维度的名称和判定说明，不需要改代码或提示词。
+# 说明文字为本项目自行编写的通用表述。
+version: 1
+dimensions:
+  - key: price
+    code: "$"
+    name: 价格
+    description: 客户为产品或服务付出的购买价格，包括定价方式、折扣、付款条件。
+  - key: availability
+    code: A
+    name: 可获得性
+    description: 客户能否方便、及时地买到和拿到产品，包括渠道、交期、供货稳定性。
+  - key: packaging
+    code: P
+    name: 包装
+    description: 产品的外观、形态、尺寸、配置组合、交付形式等客户直接看到的呈现。
+  - key: performance
+    code: P
+    name: 性能
+    description: 产品的功能与性能指标，如速度、容量、精度、功能是否满足使用场景。
+  - key: ease_of_use
+    code: E
+    name: 易用性
+    description: 安装、学习、操作、维护是否简单，包括界面、文档、上手成本。
+  - key: assurances
+    code: A
+    name: 保证
+    description: 可靠性、安全性、质量、售后服务与响应等让客户放心的承诺。
+  - key: lifecycle_cost
+    code: L
+    name: 生命周期成本
+    description: 购买之后的全部成本，包括安装、能耗、耗材、维护、升级、报废处置。
+  - key: social_acceptance
+    code: S
+    name: 社会接受程度
+    description: 品牌口碑、行业认证、法规符合性、环保与社会责任等外部认可。
+
+priorities:
+  - key: high
+    name: 高
+  - key: medium
+    name: 中
+  - key: low
+    name: 低

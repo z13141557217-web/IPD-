@@ -1,0 +1,91 @@
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+RequirementStatus = Literal["draft", "confirmed", "rejected"]
+Priority = Literal["high", "medium", "low"]
+
+
+class ORMModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str = ""
+
+
+class ProjectOut(ORMModel):
+    id: int
+    name: str
+    description: str
+    owner: str
+    created_at: datetime
+
+
+class RawInputCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=50_000)
+    source_type: str = Field(default="", max_length=50)
+
+
+class RawInputOut(ORMModel):
+    id: int
+    project_id: int
+    source_type: str
+    content: str
+    status: str
+    error: str | None
+    created_at: datetime
+
+
+class RequirementOut(ORMModel):
+    id: int
+    project_id: int
+    input_id: int | None
+    title: str
+    description: str
+    source_quote: str
+    quote_verified: bool
+    appeals: str | None
+    priority: str
+    priority_reason: str
+    status: str
+    duplicate_of_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RequirementUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = None
+    appeals: str | None = None
+    priority: Priority | None = None
+    status: RequirementStatus | None = None
+
+
+class ExtractionResult(BaseModel):
+    input: RawInputOut
+    requirements: list[RequirementOut]
+
+
+class LLMCallOut(ORMModel):
+    id: int
+    project_id: int | None
+    input_id: int | None
+    task: str
+    prompt_version: str
+    provider: str
+    model: str
+    request: dict[str, Any]
+    response: str | None
+    error: str | None
+    latency_ms: int
+    created_at: datetime
+
+
+class HealthOut(BaseModel):
+    status: str
+    llm_provider: str
+    llm_model: str
+    demo_mode: bool
