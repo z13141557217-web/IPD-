@@ -19,6 +19,12 @@ def load_classification() -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
+@lru_cache
+def load_prompts() -> dict[str, Any]:
+    with (_RULES_DIR / "prompts.yaml").open(encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
 def category_keys() -> set[str]:
     return {c["key"] for c in load_classification()["categories"]}
 
