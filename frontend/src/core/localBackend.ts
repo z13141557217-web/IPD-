@@ -31,6 +31,7 @@ import {
   subcategoryKeys,
 } from "./analysis";
 import { blankRequirement, type Persistence, type Stored } from "./persistence";
+import { buildSample, SAMPLE_ID_COUNT } from "./sample";
 
 /** 调用模型。失败时抛出带中文说明的 Error。 */
 export type LlmFunction = (prompt: string) => Promise<string>;
@@ -278,6 +279,16 @@ export function createLocalBackend(options: LocalBackendOptions): Api {
       if (!project.name) throw new Error("项目名称不能为空");
       await store.saveProject(project);
       return settle(project);
+    },
+
+    createSampleProject: async () => {
+      const store = await options.persistence();
+      const built = buildSample(await store.reserveIds(SAMPLE_ID_COUNT), new Date().toISOString());
+      // 先存项目：万一中途失败，项目已经在列表里，可以直接删掉重来。
+      await store.saveProject(built.project);
+      for (const input of built.inputs) await store.saveInput(input);
+      await store.saveRequirements(built.requirements);
+      return settle(built.project);
     },
 
     updateProject: async (projectId, patch) => {

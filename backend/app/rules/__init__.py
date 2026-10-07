@@ -25,6 +25,13 @@ def load_prompts() -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
+@lru_cache
+def load_sample_project() -> dict[str, Any]:
+    """演示项目的内容。调用方不要修改返回值。"""
+    with (_RULES_DIR / "sample_project.yaml").open(encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
 def category_keys() -> set[str]:
     return {c["key"] for c in load_classification()["categories"]}
 

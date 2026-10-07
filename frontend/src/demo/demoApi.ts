@@ -5,15 +5,11 @@
 import type { Api } from "../api";
 import { createLocalBackend } from "../core/localBackend";
 import { MemoryPersistence } from "../core/persistence";
-import { seedInputs, seedProjects, seedRequirements } from "./seed";
+import { buildSeed } from "./seed";
 
 // 写成函数而不是模块级的常量：别的构建方式不调用它，打包时示例数据就不会被带进去。
 export function createDemoApi(): Api {
-  const memory = new MemoryPersistence({
-    projects: seedProjects,
-    inputs: seedInputs,
-    requirements: seedRequirements,
-  });
+  const memory = new MemoryPersistence(buildSeed());
   return createLocalBackend({
     version: `${__APP_VERSION__}（预览）`,
     persistence: async () => memory,
