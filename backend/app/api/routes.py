@@ -15,6 +15,7 @@ from app.llm.providers import LLMError
 from app.services.extraction import extract_requirements
 from app.services.latent import NotEnoughRequirements, discover_latent_needs
 from app.services.parsing import ModelOutputError
+from app.services.sample import create_sample_project
 from app.services.settings import LLMConfig, get_llm_config, key_hint, save_llm_config
 from app.version import __version__
 
@@ -153,6 +154,14 @@ def create_project(body: schemas.ProjectCreate, db: Session = Depends(get_db)) -
         name=body.name.strip(), description=body.description, owner=get_settings().default_user
     )
     db.add(project)
+    db.commit()
+    return project
+
+
+@router.post("/projects/sample", response_model=schemas.ProjectOut, status_code=201)
+def create_sample_project_route(db: Session = Depends(get_db)) -> Project:
+    """载入演示项目：一套预置的材料和需求。之后的操作和普通项目完全一样。"""
+    project = create_sample_project(db, owner=get_settings().default_user)
     db.commit()
     return project
 

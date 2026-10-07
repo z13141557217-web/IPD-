@@ -58,6 +58,8 @@ export interface Project {
   description: string;
   /** 已经问过、客户不在意的方面，不再提示补问 */
   dismissed_probes: string[];
+  /** 演示项目：内容是预置的示例。除了这个标记，用起来和普通项目一样。 */
+  is_sample?: boolean;
 }
 
 export interface RawInput {
@@ -195,6 +197,8 @@ const realApi = {
   listProjects: () => request<Project[]>("/projects"),
   createProject: (name: string) =>
     request<Project>("/projects", { method: "POST", body: JSON.stringify({ name }) }),
+  /** 载入演示项目：一套预置的材料和需求。 */
+  createSampleProject: () => request<Project>("/projects/sample", { method: "POST" }),
   updateProject: (
     id: number,
     patch: Partial<Pick<Project, "name" | "description" | "dismissed_probes">>,

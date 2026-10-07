@@ -13,6 +13,7 @@ import {
   type RequirementPatch,
   type RequirementStatus,
 } from "./api";
+import { tryMaterials } from "./core/sample";
 import DispositionView from "./DispositionView";
 import QuestionList, { type Probe } from "./QuestionList";
 import RequirementRow from "./RequirementRow";
@@ -80,7 +81,10 @@ export default function App() {
 
   const [creating, setCreating] = useState(false);
   // 项目标题旁的操作：改名、删除（删除要在页面上再确认一次）
-  const [projectAction, setProjectAction] = useState<null | "rename" | "delete" | "deleting">(null);
+  const [projectAction, setProjectAction] = useState<
+    null | "rename" | "delete" | "deleting" | "reset" | "resetting"
+  >(null);
+  const [loadingSample, setLoadingSample] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [editingBackground, setEditingBackground] = useState(false);
   const [backgroundDraft, setBackgroundDraft] = useState("");
@@ -145,6 +149,50 @@ export default function App() {
       setError(messageOf(err));
     } finally {
       setCreating(false);
+    }
+  }
+
+  /** 打开演示项目：已经有就直接切过去，没有就载入一份。 */
+  async function openSampleProject() {
+    const existing = projects.find((p) => p.is_sample);
+    if (existing) {
+      setProjectId(existing.id);
+      setPage("work");
+      return;
+    }
+    if (loadingSample) return;
+    setError(null);
+    setLoadingSample(true);
+    try {
+      const created = await api.createSampleProject();
+      setProjects((ps) => [created, ...ps.filter((p) => p.id !== created.id)]);
+      setProjectId(created.id);
+      setPage("work");
+    } catch (err) {
+      setError(messageOf(err));
+    } finally {
+      setLoadingSample(false);
+    }
+  }
+
+  /** 把演示项目恢复成刚载入时的样子：先载入一份新的，成功后再删掉旧的。 */
+  async function resetSampleProject() {
+    if (!project) return;
+    const old = project;
+    setError(null);
+    setProjectAction("resetting");
+    try {
+      const created = await api.createSampleProject();
+      await api.deleteProject(old.id);
+      setProjects((ps) => [created, ...ps.filter((p) => p.id !== old.id && p.id !== created.id)]);
+      setProjectId(created.id);
+      setContent("");
+      setRequester("");
+    } catch (err) {
+      setError(messageOf(err));
+      // 新的一份可能已经载入成功、旧的没删掉，重新读一遍列表，以实际情况为准。
+      await api.listProjects().then(setProjects).catch(() => undefined);
+      setProjectAction(null);
     }
   }
 
@@ -384,6 +432,7 @@ export default function App() {
                 }}
               >
                 {p.name}
+                {p.is_sample && <span className="sample-tag">演示</span>}
               </button>
             </li>
           ))}
@@ -401,6 +450,9 @@ export default function App() {
             {creating ? "创建中…" : "新建"}
           </button>
         </form>
+        <button className="btn sample-load" disabled={loadingSample} onClick={() => void openSampleProject()}>
+          {loadingSample ? "正在载入…" : projects.some((p) => p.is_sample) ? "打开演示项目" : "载入演示项目"}
+        </button>
         <div className="side-foot">
           <button
             className={page === "settings" ? "project active" : "project"}
@@ -444,7 +496,15 @@ export default function App() {
         {page === "settings" ? (
           <SettingsPage onSaved={() => void api.health().then(setHealth).catch(() => undefined)} />
         ) : project === null ? (
-          <p className="empty">在左侧新建或选择一个项目。</p>
+          <div className="empty start">
+            <p>在左侧新建一个项目，开始录入你自己的材料。</p>
+            <p>
+              想先看看整个流程，或者要给别人演示：
+              <button className="btn" disabled={loadingSample} onClick={() => void openSampleProject()}>
+                {loadingSample ? "正在载入…" : "载入演示项目"}
+              </button>
+            </p>
+          </div>
         ) : (
           <>
             <header className="project-head">
@@ -480,6 +540,11 @@ export default function App() {
                       >
                         改名
                       </button>
+                      {project.is_sample && (
+                        <button type="button" className="link" onClick={() => setProjectAction("reset")}>
+                          恢复初始状态
+                        </button>
+                      )}
                       <button type="button" className="link" onClick={() => setProjectAction("delete")}>
                         删除项目
                       </button>
@@ -511,6 +576,34 @@ export default function App() {
                     </button>
                   </span>
                 </div>
+              )}
+              {(projectAction === "reset" || projectAction === "resetting") && (
+                <div className="banner banner-warn confirm" role="alertdialog" aria-label="确认恢复初始状态">
+                  <span>把演示项目恢复成刚载入时的样子？你在这个项目里录入的材料和做过的修改都会清掉。</span>
+                  <span className="actions">
+                    <button
+                      className="btn btn-primary"
+                      disabled={projectAction === "resetting"}
+                      onClick={() => void resetSampleProject()}
+                    >
+                      {projectAction === "resetting" ? "正在恢复…" : "确认恢复"}
+                    </button>
+                    <button
+                      className="btn"
+                      disabled={projectAction === "resetting"}
+                      onClick={() => setProjectAction(null)}
+                    >
+                      取消
+                    </button>
+                  </span>
+                </div>
+              )}
+              {project.is_sample && !IS_DEMO && (
+                <p className="sample-note">
+                  这是演示项目。已有的需求是事先写好的示例，不是模型的输出；你在这里录入的新材料
+                  {health?.demo_mode ? "按当前的设置处理" : "由模型现场分析"}
+                  ，确认、合并、追问、去向都和正式项目一样，并且会保存。
+                </p>
               )}
               {editingBackground ? (
                 <div className="background-edit">
@@ -613,6 +706,27 @@ export default function App() {
                   </button>
                 </div>
               </form>
+
+              {project.is_sample && (
+                <p className="try-materials">
+                  演示用的材料，点一下填进上面的框：
+                  {tryMaterials.map((m) => (
+                    <button
+                      key={m.label}
+                      type="button"
+                      className="chip"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        setContent(m.content);
+                        setRequester(m.requester);
+                        if (SOURCE_TYPES.includes(m.source_type)) setSourceType(m.source_type);
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </p>
+              )}
 
               {busy !== null && IS_HOSTED && (
                 <p className="muted" role="status">

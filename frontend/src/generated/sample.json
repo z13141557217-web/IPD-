@@ -1,0 +1,232 @@
+{
+  "project": {
+    "name": "智能门锁（演示）",
+    "description": "客户是连锁长租公寓运营商，一名管家负责约两百间房的门锁，租客流动频繁。"
+  },
+  "inputs": [
+    {
+      "ref": "a",
+      "source_type": "客户",
+      "requester": "城南公寓",
+      "content": "门锁开机太慢，指纹识别要等两秒。\n报价比竞品高了一成，希望能给折扣。\n安装说明书看不懂，师傅上门装了一个小时。\n售后响应慢，报修三天没人管。"
+    },
+    {
+      "ref": "b",
+      "source_type": "客户",
+      "requester": "城北公寓",
+      "content": "指纹开锁慢得受不了。\n锁要能接进我们现在用的公寓管理系统，不想再单独开一个后台。"
+    },
+    {
+      "ref": "c",
+      "source_type": "销售或市场",
+      "requester": "华东区销售",
+      "content": "有客户问能不能在锁上加一块屏幕显示天气。\n今年新招标的项目都要求锁通过公安部的检测认证，没有证书连标都投不了。"
+    }
+  ],
+  "requirements": [
+    {
+      "ref": 1,
+      "input": "a",
+      "title": "走到门口伸手即开，无需停顿",
+      "description": "住户希望开门是一个连贯动作，不需要停下来等锁反应。",
+      "source_quote": "门锁开机太慢，指纹识别要等两秒",
+      "stated_request": "希望指纹识别快一点",
+      "underlying_problem": "住户到门口时手里常提着东西，等待的两秒里门锁没有任何反馈，会怀疑没识别上而重复按压。",
+      "reasoning": "材料只说了等两秒，没有说明场景。提东西、重复按压是按常见情况推测的，需要向客户确认。",
+      "confidence": "medium",
+      "open_questions": [
+        "等待的两秒里，用户通常会做什么？会重复按吗？",
+        "慢是每次都慢，还是隔一段时间不用后才慢？"
+      ],
+      "demand_type": "strategic",
+      "category": "quality",
+      "subcategory": "performance",
+      "disposition": "next",
+      "disposition_reason": "影响每天使用，但需要改识别方案，赶不上当前版本。",
+      "appeals": "performance",
+      "priority": "high",
+      "priority_reason": "客户首先提到，且直接影响每天的使用。"
+    },
+    {
+      "ref": 2,
+      "input": "a",
+      "title": "让客户看得到价差对应的价值",
+      "description": "客户需要一个能向内部交代的理由，说明为什么值得多付一成。",
+      "source_quote": "报价比竞品高了一成，希望能给折扣",
+      "stated_request": "希望给折扣",
+      "underlying_problem": "客户没有看到与多出的一成价格相对应的价值，所以只能在价格上比较。",
+      "reasoning": "客户拿竞品报价作比较，说明在他看来两者差不多。降价只是其中一种解法。",
+      "confidence": "low",
+      "open_questions": [
+        "对比的是哪家竞品的哪个型号？",
+        "如果价格不变，增加什么会让你愿意接受？"
+      ],
+      "demand_type": "project",
+      "category": "functional",
+      "appeals": "price",
+      "priority": "medium",
+      "priority_reason": "影响成交，但材料没有说明是否因此丢单。"
+    },
+    {
+      "ref": 3,
+      "input": "a",
+      "title": "安装师傅第一次装也能快速装对",
+      "description": "不依赖师傅经验，安装时间可预期。",
+      "source_quote": "安装说明书看不懂，师傅上门装了一个小时",
+      "stated_request": "说明书要写得让人看懂",
+      "underlying_problem": "安装依赖师傅的个人经验，耗时不可控，客户要承担等待时间和上门费用。",
+      "reasoning": "材料直接给出了后果：装了一个小时。问题不在说明书的文字，而在安装过程本身容易出错。",
+      "confidence": "high",
+      "demand_type": "strategic",
+      "category": "quality",
+      "subcategory": "maintainability",
+      "disposition": "current",
+      "disposition_reason": "已经在增加上门成本，改安装引导即可。",
+      "appeals": "ease_of_use",
+      "priority": "high",
+      "priority_reason": "材料明确描述了耗时后果。",
+      "status": "confirmed"
+    },
+    {
+      "ref": 4,
+      "input": "a",
+      "title": "锁出故障时当天能恢复正常进出",
+      "description": "客户要的是尽快恢复使用，而不只是有人接电话。",
+      "source_quote": "售后响应慢，报修三天没人管",
+      "stated_request": "售后响应要快",
+      "underlying_problem": "门锁出故障意味着进不了家门或门锁不上，客户等不起三天。",
+      "reasoning": "门锁是进出家门的必经环节，故障的后果比一般家电严重。材料没有说明具体是什么故障。",
+      "confidence": "medium",
+      "open_questions": [
+        "报修的是什么故障？当时还能正常开关门吗？"
+      ],
+      "category": "quality",
+      "subcategory": "reliability",
+      "disposition": "current",
+      "disposition_reason": "涉及进出家门，不能拖。",
+      "appeals": "assurances",
+      "priority": "high",
+      "priority_reason": "涉及安全和基本使用。"
+    },
+    {
+      "ref": 5,
+      "input": "b",
+      "title": "开门不需要等待",
+      "description": "开锁动作要连贯。",
+      "source_quote": "指纹开锁慢得受不了",
+      "stated_request": "希望开锁快一点",
+      "underlying_problem": "租客在门口等待，体验差。",
+      "reasoning": "与已有的一条需求说的是同一件事。",
+      "confidence": "high",
+      "demand_type": "strategic",
+      "category": "quality",
+      "subcategory": "performance",
+      "disposition": "next",
+      "disposition_reason": "同已有需求。",
+      "appeals": "performance",
+      "priority": "high",
+      "priority_reason": "第二家客户也在提。",
+      "duplicate_of": 1
+    },
+    {
+      "ref": 6,
+      "input": "b",
+      "title": "管家在现有的公寓管理系统里就能管锁",
+      "description": "发密码、收回权限、查开门记录都在客户已经在用的系统里完成。",
+      "source_quote": "锁要能接进我们现在用的公寓管理系统，不想再单独开一个后台",
+      "stated_request": "接入客户的公寓管理系统",
+      "underlying_problem": "一名管家管约两百间房，租客流动频繁。多一个后台就要多一遍操作、多一处对不上的数据。",
+      "reasoning": "客户背景里有管家人均管房数和租客流动频繁这两点；材料明确说了不想多开一个后台。具体要接哪些操作，材料没有说。",
+      "confidence": "medium",
+      "open_questions": [
+        "现在用的是哪家的公寓管理系统？对方有没有开放接口？",
+        "最常做的是哪几个操作：发密码、退租收回、查记录？"
+      ],
+      "demand_type": "strategic",
+      "category": "functional",
+      "disposition": "next",
+      "disposition_reason": "要和对方系统对接，当前版本排不进。",
+      "appeals": "packaging",
+      "priority": "high",
+      "priority_reason": "直接决定管家每天的工作量。"
+    },
+    {
+      "ref": 7,
+      "input": "c",
+      "title": "通过公安部检测认证",
+      "description": "没有认证证书不能参加今年的新招标。",
+      "source_quote": "今年新招标的项目都要求锁通过公安部的检测认证，没有证书连标都投不了",
+      "stated_request": "锁要通过公安部的检测认证",
+      "underlying_problem": "认证是投标的入场条件，没有就没有成交机会，与产品好坏无关。",
+      "reasoning": "材料把后果说得很清楚：连标都投不了。这是必须满足的约束，不参与和其他需求比先后。",
+      "confidence": "high",
+      "open_questions": [
+        "招标文件里写的是哪一项标准、哪个等级？"
+      ],
+      "demand_type": "strategic",
+      "category": "constraint",
+      "subcategory": "regulations",
+      "disposition": "current",
+      "disposition_reason": "入场条件，不满足就没有后面的事。",
+      "appeals": "assurances",
+      "priority": "high",
+      "priority_reason": "不满足就无法投标。",
+      "status": "confirmed"
+    },
+    {
+      "ref": 8,
+      "input": "c",
+      "title": "在锁上显示天气",
+      "description": "出门前在门锁上看到天气。",
+      "source_quote": "有客户问能不能在锁上加一块屏幕显示天气",
+      "stated_request": "加一块屏幕显示天气",
+      "underlying_problem": "材料没有说明客户想解决什么问题。",
+      "reasoning": "只有一句转述，没有场景、没有后果，看不出背后的问题。",
+      "confidence": "low",
+      "open_questions": [
+        "是哪家客户提的？他是在什么情况下想到这个的？"
+      ],
+      "demand_type": "project",
+      "category": "functional",
+      "disposition": "undecided",
+      "appeals": "packaging",
+      "priority": "low",
+      "priority_reason": "只有一处转述，没有说明不满足的后果。",
+      "status": "rejected",
+      "reject_reason": "只有一位客户随口一问，说不出要解决什么问题；加屏幕会明显增加耗电和成本。先不做，再有人提时追问场景。"
+    },
+    {
+      "ref": 9,
+      "kind": "latent",
+      "title": "锁在出问题之前先提醒，并能自行恢复",
+      "description": "住户不想等到进不了门才发现问题。",
+      "based_on": [
+        4,
+        3
+      ],
+      "reasoning": "售后慢和安装难都发生在需要人上门的环节。客户抱怨的是上门慢，但更根本的是他不希望落到需要上门的地步。",
+      "validation_plan": "回访 5 位报修过的客户，问故障发生前有没有征兆、如果提前收到提醒会怎么做。",
+      "open_questions": [
+        "故障前有没有电量低、反应变慢之类的征兆？"
+      ],
+      "category": "quality",
+      "subcategory": "reliability",
+      "appeals": "assurances",
+      "priority_reason": "依据来自两条高优先级需求，但尚未验证。"
+    }
+  ],
+  "try_materials": [
+    {
+      "label": "第三家客户的反馈",
+      "source_type": "客户",
+      "requester": "城西公寓",
+      "content": "指纹识别太慢了，下雨天手湿的时候经常要按好几次。\n电池用得太快，两个月就要换一次，两百多间房换一轮要跑好几天。\n租客退租以后，我们得一间一间上门去删指纹，太费人了。\n有两次锁没电了，租客半夜被关在门外，投诉到了总部。"
+    },
+    {
+      "label": "一段访谈记录",
+      "source_type": "客户",
+      "requester": "城东公寓",
+      "content": "访谈对象：城东公寓运营总监。\n他说今年集团考核他们的指标是人房比，一个管家要从管两百间提到管三百间，所以凡是要管家跑现场的事情他都想砍掉。\n去年换过一批别家的锁，最头疼的不是锁本身，是出了问题不知道是锁坏了还是网断了，管家到了现场才知道白跑一趟。\n他还提到集团明年要统一采购，会要求供应商提供三年质保和备件承诺。"
+    }
+  ]
+}

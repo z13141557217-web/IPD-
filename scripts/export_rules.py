@@ -54,6 +54,11 @@ def build_rules() -> dict:
     }
 
 
+def build_sample() -> dict:
+    """演示项目的内容，原样导出。"""
+    return yaml.safe_load((RULES / "sample_project.yaml").read_text(encoding="utf-8"))
+
+
 MATERIAL = "设备开机太慢，要等两分钟。\n另外报价比竞品高了一成。\n老是坏，一个月修了三次。"
 
 
@@ -231,4 +236,5 @@ if __name__ == "__main__":
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
     (TARGET_DIR / "rules.json").write_text(render(build_rules()), encoding="utf-8")
     (TARGET_DIR / "parity.json").write_text(render(build_parity()), encoding="utf-8")
-    print(f"已写入 {TARGET_DIR.relative_to(ROOT)}/rules.json 和 parity.json")
+    (TARGET_DIR / "sample.json").write_text(render(build_sample()), encoding="utf-8")
+    print(f"已写入 {TARGET_DIR.relative_to(ROOT)}/rules.json、parity.json 和 sample.json")

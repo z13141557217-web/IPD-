@@ -33,6 +33,7 @@ class ProjectOut(ORMModel):
     name: str
     description: str
     dismissed_probes: list[str]
+    is_sample: bool
     owner: str
     created_at: datetime
 

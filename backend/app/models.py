@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -20,6 +20,8 @@ class Project(Base):
     owner: Mapped[str] = mapped_column(String(100))
     # 用户已经问过、确认客户不在意的方面（质量属性或约束的 key），不再提示补问。
     dismissed_probes: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    # 演示项目：内容是预置的示例。除了多一个标记，用起来和普通项目完全一样。
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

@@ -20,6 +20,8 @@ def test_generated_files_are_up_to_date():
     parity = json.loads((GENERATED / "parity.json").read_text(encoding="utf-8"))
     assert rules == json.loads(module.render(module.build_rules()))
     assert parity == json.loads(module.render(module.build_parity()))
+    sample = json.loads((GENERATED / "sample.json").read_text(encoding="utf-8"))
+    assert sample == json.loads(module.render(module.build_sample()))
 
 
 def test_parity_cases_cover_both_success_and_failure():
