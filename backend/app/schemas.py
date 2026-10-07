@@ -141,7 +141,38 @@ class LLMCallOut(ORMModel):
     created_at: datetime
 
 
+class LLMSettingsOut(BaseModel):
+    provider: str
+    base_url: str
+    model: str
+    # 密钥本身永远不返回，只说明有没有，以及末四位。
+    api_key_set: bool
+    api_key_hint: str
+    # settings：在设置页保存的；env：来自环境变量
+    source: str
+
+
+class LLMSettingsUpdate(BaseModel):
+    provider: Literal["mock", "openai_compatible"]
+    base_url: str = Field(default="", max_length=500)
+    model: str = Field(default="", max_length=100)
+    # 不传或传 null：保留原来的密钥；传空字符串：清除密钥
+    api_key: str | None = Field(default=None, max_length=500)
+
+
+class SettingsOut(BaseModel):
+    version: str
+    llm: LLMSettingsOut
+
+
+class LLMTestResult(BaseModel):
+    ok: bool
+    latency_ms: int
+    message: str
+
+
 class HealthOut(BaseModel):
+    version: str
     status: str
     llm_provider: str
     llm_model: str

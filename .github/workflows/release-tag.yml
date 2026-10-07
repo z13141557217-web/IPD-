@@ -1,0 +1,40 @@
+name: 打版本标签
+
+# main 上的 VERSION 变了，就创建对应的 v版本号 标签和发布说明。
+# 发布说明取自 CHANGELOG.md 里这一版的小节。
+
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 创建标签和发布说明
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          tag="v${version}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag 已存在，跳过。"
+            exit 0
+          fi
+          # 取出 CHANGELOG 中 “## [版本号]” 到下一个 “## [” 之间的内容
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && index($0, "## [") == 1 { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md 里没有 ${version} 的小节。" >&2
+            exit 1
+          fi
+          gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes-file notes.md

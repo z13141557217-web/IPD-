@@ -1,3 +1,5 @@
+import { demoApi } from "./demo/demoApi";
+
 export type Priority = "high" | "medium" | "low";
 export type RequirementStatus = "draft" | "confirmed" | "rejected" | "merged";
 export type Category = "functional" | "quality" | "constraint" | "unknown";
@@ -8,7 +10,38 @@ export type ValidationStatus = "unverified" | "validated" | "invalidated";
 /** strategic：客户中长期的需求；project：某一次项目的个别要求 */
 export type DemandType = "strategic" | "project" | "unknown";
 
+export interface LLMSettings {
+  provider: "mock" | "openai_compatible";
+  base_url: string;
+  model: string;
+  /** 密钥本身不会从后端返回，只知道有没有，以及末四位 */
+  api_key_set: boolean;
+  api_key_hint: string;
+  /** settings：在设置页保存的；env：来自环境变量 */
+  source: "settings" | "env";
+}
+
+export interface AppSettings {
+  version: string;
+  llm: LLMSettings;
+}
+
+export interface LLMSettingsUpdate {
+  provider: LLMSettings["provider"];
+  base_url: string;
+  model: string;
+  /** null：保留原来的密钥；空字符串：清除 */
+  api_key: string | null;
+}
+
+export interface LLMTestResult {
+  ok: boolean;
+  latency_ms: number;
+  message: string;
+}
+
 export interface Health {
+  version: string;
   status: string;
   llm_provider: string;
   llm_model: string;
@@ -145,8 +178,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return resp.json() as Promise<T>;
 }
 
-export const api = {
+const realApi = {
   health: () => request<Health>("/health"),
+  getSettings: () => request<AppSettings>("/settings"),
+  saveLlmSettings: (body: LLMSettingsUpdate) =>
+    request<LLMSettings>("/settings/llm", { method: "PUT", body: JSON.stringify(body) }),
+  testLlm: () => request<LLMTestResult>("/settings/llm/test", { method: "POST" }),
   appeals: () => request<AppealsRules>("/rules/appeals"),
   classification: () => request<ClassificationRules>("/rules/classification"),
   listProjects: () => request<Project[]>("/projects"),
@@ -177,3 +214,10 @@ export const api = {
   updateRequirement: (id: number, patch: RequirementPatch) =>
     request<Requirement>(`/requirements/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 };
+
+export type Api = typeof realApi;
+
+/** 预览版：不连后端，数据在浏览器内存里，用于让人直接点开看界面。 */
+export const IS_DEMO = import.meta.env.VITE_DEMO === "1";
+
+export const api: Api = IS_DEMO ? demoApi : realApi;

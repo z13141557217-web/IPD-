@@ -7,32 +7,32 @@ import time
 
 from sqlalchemy.orm import Session
 
-from app.config import Settings, get_settings
 from app.llm.providers import LLMError, MockProvider, OpenAICompatibleProvider, Provider
 from app.models import LLMCall
+from app.services.settings import LLMConfig, get_llm_config
 
 
-def build_provider(settings: Settings) -> Provider:
-    if settings.llm_provider == "mock":
+def build_provider(config: LLMConfig) -> Provider:
+    if config.provider == "mock":
         return MockProvider()
-    if settings.llm_provider == "openai_compatible":
+    if config.provider == "openai_compatible":
         return OpenAICompatibleProvider(
-            base_url=settings.llm_base_url,
-            api_key=settings.llm_api_key,
-            model=settings.llm_model,
-            timeout=settings.llm_timeout_seconds,
+            base_url=config.base_url,
+            api_key=config.api_key,
+            model=config.model,
+            timeout=config.timeout,
         )
-    raise LLMError(f"不认识的 LLM_PROVIDER：{settings.llm_provider}")
+    raise LLMError(f"不认识的模型接入方式：{config.provider}")
 
 
 class LLMGateway:
     def __init__(self, provider: Provider | None = None) -> None:
+        # 测试时可以直接传入一个提供方；正常运行时每次调用都读取当前配置，
+        # 这样在设置页改完配置立即生效，不需要重启。
         self._provider = provider
 
-    def _get_provider(self) -> Provider:
-        if self._provider is None:
-            self._provider = build_provider(get_settings())
-        return self._provider
+    def _get_provider(self, config: LLMConfig) -> Provider:
+        return self._provider or build_provider(config)
 
     def complete(
         self,
@@ -46,19 +46,19 @@ class LLMGateway:
         input_id: int | None = None,
     ) -> str:
         """调用模型并返回文本。无论成功失败都会写一条调用记录并立即提交。"""
-        settings = get_settings()
+        config = get_llm_config(db)
         call = LLMCall(
             project_id=project_id,
             input_id=input_id,
             task=task,
             prompt_version=prompt_version,
-            provider=settings.llm_provider,
-            model=settings.llm_model or "",
+            provider=config.provider,
+            model=config.model or "",
             request={"system": system, "user": user},
         )
         started = time.monotonic()
         try:
-            provider = self._get_provider()
+            provider = self._get_provider(config)
             call.provider, call.model = provider.name, provider.model
             text = provider.complete(system, user)
             call.response = text
