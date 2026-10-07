@@ -146,14 +146,17 @@ def test_latent_need_cannot_be_confirmed_before_validation(make_client):
     pid, ids = _seed(client)
     lid = client.post(f"/api/projects/{pid}/latent-needs").json()["requirements"][0]["id"]
 
-    blocked = client.patch(f"/api/requirements/{lid}", json={"status": "confirmed"})
+    blocked = client.patch(
+        f"/api/requirements/{lid}", json={"status": "confirmed", "disposition": "next"}
+    )
     assert blocked.status_code == 422
     assert "验证" in blocked.json()["detail"]
     [still] = [r for r in client.get(f"/api/projects/{pid}/requirements").json() if r["id"] == lid]
     assert still["status"] == "draft"
 
     ok = client.patch(
-        f"/api/requirements/{lid}", json={"validation_status": "validated", "status": "confirmed"}
+        f"/api/requirements/{lid}",
+        json={"validation_status": "validated", "status": "confirmed", "disposition": "next"},
     )
     assert ok.status_code == 200 and ok.json()["status"] == "confirmed"
 
@@ -163,7 +166,10 @@ def test_latent_need_cannot_be_confirmed_before_validation(make_client):
 
     # 客户明确提出的需求不受这条限制
     assert (
-        client.patch(f"/api/requirements/{ids[1]}", json={"status": "confirmed"}).status_code == 200
+        client.patch(
+            f"/api/requirements/{ids[1]}", json={"status": "confirmed", "disposition": "current"}
+        ).status_code
+        == 200
     )
 
 

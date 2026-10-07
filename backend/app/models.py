@@ -18,6 +18,8 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     owner: Mapped[str] = mapped_column(String(100))
+    # 用户已经问过、确认客户不在意的方面（质量属性或约束的 key），不再提示补问。
+    dismissed_probes: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -30,6 +32,8 @@ class RawInput(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
     created_by: Mapped[str] = mapped_column(String(100))
     source_type: Mapped[str] = mapped_column(String(50), default="")
+    # 提出者：客户名称，或内部提出需求的部门或人。用来看一条需求有多少方在提。
+    requester: Mapped[str] = mapped_column(String(100), default="", server_default="")
     content: Mapped[str] = mapped_column(Text)
     # pending 尚未提取 / processed 已提取 / failed 提取失败，可重试
     status: Mapped[str] = mapped_column(String(20), default="pending")
@@ -63,6 +67,15 @@ class Requirement(Base):
     # stated 客户明确提出的诉求，经分析还原出真实需求
     # latent 客户没有明说、由多条需求推断出的潜在需求假设
     kind: Mapped[str] = mapped_column(String(20), default="stated", server_default="stated")
+    # 需求类别：functional 功能 / quality 质量属性 / constraint 设计约束 / unknown 未判断
+    # 子类见 app/rules/classification.yaml；功能性需求没有子类。
+    category: Mapped[str] = mapped_column(String(20), default="unknown", server_default="unknown")
+    subcategory: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # 去向：current / next / tech / long / undecided。确认时必须已选定。
+    disposition: Mapped[str] = mapped_column(String(20), default="undecided", server_default="undecided")
+    disposition_reason: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # 否决理由，用于答复提出者。
+    reject_reason: Mapped[str] = mapped_column(Text, default="", server_default="")
     # 需求类型：strategic 关系到客户中长期经营方向的需求，会持续存在
     #          project   针对某一次交付或某个具体项目的个别要求
     #          unknown   材料不足以判断
@@ -87,6 +100,7 @@ class Requirement(Base):
     )
 
     # draft 模型给出、待人确认 / confirmed 已确认 / rejected 已否决
+    # merged 与另一条需求实质相同，已并入 duplicate_of_id 指向的那一条
     # latent 类型的需求必须先验证成立才能确认。
     status: Mapped[str] = mapped_column(String(20), default="draft")
     duplicate_of_id: Mapped[int | None] = mapped_column(

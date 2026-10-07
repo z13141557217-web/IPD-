@@ -1,5 +1,7 @@
 export type Priority = "high" | "medium" | "low";
-export type RequirementStatus = "draft" | "confirmed" | "rejected";
+export type RequirementStatus = "draft" | "confirmed" | "rejected" | "merged";
+export type Category = "functional" | "quality" | "constraint" | "unknown";
+export type Disposition = "current" | "next" | "tech" | "long" | "undecided";
 export type RequirementKind = "stated" | "latent";
 export type Confidence = "high" | "medium" | "low";
 export type ValidationStatus = "unverified" | "validated" | "invalidated";
@@ -17,12 +19,15 @@ export interface Project {
   id: number;
   name: string;
   description: string;
+  /** 已经问过、客户不在意的方面，不再提示补问 */
+  dismissed_probes: string[];
 }
 
 export interface RawInput {
   id: number;
   project_id: number;
   source_type: string;
+  requester: string;
   content: string;
   status: "pending" | "processed" | "failed";
   error: string | null;
@@ -42,6 +47,14 @@ export interface Requirement {
   priority_reason: string;
   /** stated：客户明确提出的诉求；latent：客户没有明说的潜在需求假设 */
   kind: RequirementKind;
+  category: Category;
+  subcategory: string | null;
+  disposition: Disposition;
+  disposition_reason: string;
+  reject_reason: string;
+  /** 这条需求被提到几处（自己加上并入它的需求） */
+  mention_count: number;
+  requesters: string[];
   demand_type: DemandType;
   stated_request: string;
   underlying_problem: string;
@@ -72,6 +85,21 @@ export interface AppealsDimension {
   description: string;
 }
 
+export interface QualityAttribute {
+  key: string;
+  name: string;
+  description: string;
+  probe: string;
+}
+
+export interface ClassificationRules {
+  categories: { key: Category; name: string; description: string }[];
+  quality_attributes: QualityAttribute[];
+  constraints: { key: string; name: string }[];
+  constraint_probe: string;
+  dispositions: { key: Disposition; name: string; description: string }[];
+}
+
 export interface AppealsRules {
   dimensions: AppealsDimension[];
 }
@@ -86,6 +114,10 @@ export type RequirementPatch = Partial<
     | "status"
     | "validation_status"
     | "demand_type"
+    | "category"
+    | "subcategory"
+    | "disposition"
+    | "reject_reason"
     | "open_questions"
   >
 >;
@@ -116,23 +148,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<Health>("/health"),
   appeals: () => request<AppealsRules>("/rules/appeals"),
+  classification: () => request<ClassificationRules>("/rules/classification"),
   listProjects: () => request<Project[]>("/projects"),
   createProject: (name: string) =>
     request<Project>("/projects", { method: "POST", body: JSON.stringify({ name }) }),
-  updateProject: (id: number, patch: Partial<Pick<Project, "name" | "description">>) =>
+  updateProject: (
+    id: number,
+    patch: Partial<Pick<Project, "name" | "description" | "dismissed_probes">>,
+  ) =>
     request<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   listRequirements: (projectId: number) =>
     request<Requirement[]>(`/projects/${projectId}/requirements`),
   listInputs: (projectId: number) => request<RawInput[]>(`/projects/${projectId}/inputs`),
-  submitInput: (projectId: number, content: string, sourceType: string) =>
+  submitInput: (projectId: number, content: string, sourceType: string, requester: string) =>
     request<ExtractionResult>(`/projects/${projectId}/inputs`, {
       method: "POST",
-      body: JSON.stringify({ content, source_type: sourceType }),
+      body: JSON.stringify({ content, source_type: sourceType, requester }),
     }),
   retryExtraction: (inputId: number) =>
     request<ExtractionResult>(`/inputs/${inputId}/extract`, { method: "POST" }),
   discoverLatentNeeds: (projectId: number) =>
     request<LatentNeedsResult>(`/projects/${projectId}/latent-needs`, { method: "POST" }),
+  mergeRequirement: (id: number, targetId: number) =>
+    request<{ merged: Requirement; target: Requirement }>(`/requirements/${id}/merge`, {
+      method: "POST",
+      body: JSON.stringify({ target_id: targetId }),
+    }),
   updateRequirement: (id: number, patch: RequirementPatch) =>
     request<Requirement>(`/requirements/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 };

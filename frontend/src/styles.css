@@ -788,6 +788,60 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+/* ---- 类别、去向、合并 ---- */
+
+.requester {
+  flex: 0 1 220px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+/* 非功能需求的标签：用实心底，在一排标签里最先被看到 */
+.tag-cat {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.classification {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.classification .link,
+.note .link,
+.blind .link {
+  margin-left: 8px;
+}
+
+.decision {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.reject {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reject input {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.actions {
+  align-items: center;
+}
+
+.probe-group h3 {
+  color: var(--warn);
+}
+
+.question-group .row-tags {
+  flex: none;
+}
+
 /* ---- 窄屏 ---- */
 
 @media (max-width: 760px) {

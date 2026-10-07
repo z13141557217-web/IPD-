@@ -67,7 +67,7 @@ def test_llm_call_is_logged_with_prompt_and_response(client):
     client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL})
     [call] = client.get(f"/api/projects/{pid}/llm-calls").json()
     assert call["task"] == "extract_requirements"
-    assert call["prompt_version"] == "v3"
+    assert call["prompt_version"] == "v4"
     assert call["provider"] == "mock"
     assert MATERIAL in call["request"]["user"]
     assert call["response"] and call["error"] is None
@@ -111,7 +111,13 @@ def test_update_requirement_and_filter_by_status(client):
     rid = reqs[0]["id"]
     resp = client.patch(
         f"/api/requirements/{rid}",
-        json={"status": "confirmed", "priority": "high", "appeals": None, "title": " 新标题 "},
+        json={
+            "status": "confirmed",
+            "disposition": "next",
+            "priority": "high",
+            "appeals": None,
+            "title": " 新标题 ",
+        },
     )
     assert resp.status_code == 200
     updated = resp.json()
@@ -190,3 +196,74 @@ def test_open_questions_and_demand_type_can_be_updated(client):
     cleared = client.patch(f"/api/requirements/{rid}", json={"open_questions": []})
     assert cleared.json()["open_questions"] == []
     assert client.patch(f"/api/requirements/{rid}", json={"demand_type": "x"}).status_code == 422
+
+
+def test_confirming_requires_a_disposition(client):
+    pid = _project(client)
+    rid = client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL}).json()[
+        "requirements"
+    ][0]["id"]
+    blocked = client.patch(f"/api/requirements/{rid}", json={"status": "confirmed"})
+    assert blocked.status_code == 422
+    assert "去向" in blocked.json()["detail"]
+    ok = client.patch(f"/api/requirements/{rid}", json={"status": "confirmed", "disposition": "current"})
+    assert ok.status_code == 200
+    # 已确认的需求不能把去向改回未定，但其他字段照常可改
+    assert client.patch(f"/api/requirements/{rid}", json={"disposition": "undecided"}).status_code == 422
+    assert client.patch(f"/api/requirements/{rid}", json={"priority": "low"}).status_code == 200
+    assert client.patch(f"/api/requirements/{rid}", json={"disposition": "x"}).status_code == 422
+
+
+def test_reject_reason_is_stored(client):
+    pid = _project(client)
+    rid = client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL}).json()[
+        "requirements"
+    ][0]["id"]
+    resp = client.patch(
+        f"/api/requirements/{rid}", json={"status": "rejected", "reject_reason": "只有一家客户提，且有替代办法"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["reject_reason"] == "只有一家客户提，且有替代办法"
+
+
+def test_category_and_subcategory_must_agree(client):
+    pid = _project(client)
+    rid = client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL}).json()[
+        "requirements"
+    ][0]["id"]
+    ok = client.patch(
+        f"/api/requirements/{rid}", json={"category": "quality", "subcategory": "reliability"}
+    )
+    assert (ok.json()["category"], ok.json()["subcategory"]) == ("quality", "reliability")
+    # 子类不属于这个类别
+    bad = client.patch(f"/api/requirements/{rid}", json={"subcategory": "regulations"})
+    assert bad.status_code == 422
+    # 只改类别时，不再适用的子类自动清掉
+    changed = client.patch(f"/api/requirements/{rid}", json={"category": "functional"})
+    assert (changed.json()["category"], changed.json()["subcategory"]) == ("functional", None)
+
+
+def test_classification_rules_are_served(client):
+    rules = client.get("/api/rules/classification").json()
+    assert [c["key"] for c in rules["categories"]] == ["functional", "quality", "constraint"]
+    assert all(q["probe"] for q in rules["quality_attributes"])
+    assert {d["key"] for d in rules["dispositions"]} == {"current", "next", "tech", "long"}
+
+
+def test_requester_is_saved_and_sent_to_the_model(client):
+    pid = _project(client)
+    body = client.post(
+        f"/api/projects/{pid}/inputs", json={"content": MATERIAL, "requester": " 城南公寓 "}
+    ).json()
+    assert body["input"]["requester"] == "城南公寓"
+    assert body["requirements"][0]["requesters"] == ["城南公寓"]
+    assert body["requirements"][0]["mention_count"] == 1
+    [call] = client.get(f"/api/projects/{pid}/llm-calls").json()
+    assert '提出者="城南公寓"' in call["request"]["user"]
+
+
+def test_project_can_dismiss_probes(client):
+    pid = _project(client)
+    resp = client.patch(f"/api/projects/{pid}", json={"dismissed_probes": ["security", "constraint"]})
+    assert resp.json()["dismissed_probes"] == ["security", "constraint"]
+    assert resp.json()["name"] == "测试产品"

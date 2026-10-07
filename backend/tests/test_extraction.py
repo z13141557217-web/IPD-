@@ -121,3 +121,32 @@ def test_demand_type_defaults_to_unknown(given, expected):
     text = _wrap([{"title": "x", "demand_type": given}])
     [req] = parse_extraction(text, content=CONTENT, existing_ids=set())
     assert req["demand_type"] == expected
+
+
+@pytest.mark.parametrize(
+    ("category", "subcategory", "expected"),
+    [
+        ("quality", "reliability", ("quality", "reliability")),
+        ("constraint", "regulations", ("constraint", "regulations")),
+        ("quality", "regulations", ("quality", None)),  # 子类不属于这个类别
+        ("functional", "performance", ("functional", None)),  # 功能性需求没有子类
+        ("别的", "reliability", ("unknown", None)),
+        (None, None, ("unknown", None)),
+    ],
+)
+def test_category_and_subcategory_are_validated_together(category, subcategory, expected):
+    text = _wrap([{"title": "x", "category": category, "subcategory": subcategory}])
+    [req] = parse_extraction(text, content=CONTENT, existing_ids=set())
+    assert (req["category"], req["subcategory"]) == expected
+
+
+def test_disposition_defaults_to_undecided():
+    text = _wrap(
+        [
+            {"title": "a", "disposition": "tech", "disposition_reason": "需要先做平台"},
+            {"title": "b", "disposition": "马上做"},
+        ]
+    )
+    a, b = parse_extraction(text, content=CONTENT, existing_ids=set())
+    assert (a["disposition"], a["disposition_reason"]) == ("tech", "需要先做平台")
+    assert b["disposition"] == "undecided"

@@ -143,7 +143,10 @@ def discover_latent_needs(
     active = list(
         db.scalars(
             select(Requirement)
-            .where(Requirement.project_id == project_id, Requirement.status != "rejected")
+            .where(
+                Requirement.project_id == project_id,
+                Requirement.status.notin_(["rejected", "merged"]),
+            )
             .order_by(Requirement.id.desc())
             .limit(MAX_REQUIREMENTS)
         )

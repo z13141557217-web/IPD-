@@ -4,6 +4,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 RequirementStatus = Literal["draft", "confirmed", "rejected"]
+RequirementStatusFilter = Literal["draft", "confirmed", "rejected", "merged"]
+Category = Literal["functional", "quality", "constraint", "unknown"]
+Disposition = Literal["current", "next", "tech", "long", "undecided"]
 Priority = Literal["high", "medium", "low"]
 ValidationStatus = Literal["unverified", "validated", "invalidated"]
 DemandType = Literal["strategic", "project", "unknown"]
@@ -22,12 +25,14 @@ class ProjectUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     # 客户背景：客户是谁、什么行业、用产品做什么。每次分析都会带上。
     description: str | None = Field(default=None, max_length=5000)
+    dismissed_probes: list[str] | None = Field(default=None, max_length=30)
 
 
 class ProjectOut(ORMModel):
     id: int
     name: str
     description: str
+    dismissed_probes: list[str]
     owner: str
     created_at: datetime
 
@@ -35,12 +40,14 @@ class ProjectOut(ORMModel):
 class RawInputCreate(BaseModel):
     content: str = Field(min_length=1, max_length=50_000)
     source_type: str = Field(default="", max_length=50)
+    requester: str = Field(default="", max_length=100)
 
 
 class RawInputOut(ORMModel):
     id: int
     project_id: int
     source_type: str
+    requester: str
     content: str
     status: str
     error: str | None
@@ -59,6 +66,14 @@ class RequirementOut(ORMModel):
     priority: str
     priority_reason: str
     kind: str
+    category: str
+    subcategory: str | None
+    disposition: str
+    disposition_reason: str
+    reject_reason: str
+    # 以下两项不是数据库字段，由接口根据已并入的需求计算。
+    mention_count: int = 1
+    requesters: list[str] = []
     demand_type: str
     stated_request: str
     underlying_problem: str
@@ -84,6 +99,10 @@ class RequirementUpdate(BaseModel):
     validation_plan: str | None = None
     validation_status: ValidationStatus | None = None
     demand_type: DemandType | None = None
+    category: Category | None = None
+    subcategory: str | None = None
+    disposition: Disposition | None = None
+    reject_reason: str | None = Field(default=None, max_length=2000)
     # 追问清单：问到答案后把对应的问题去掉。
     open_questions: list[str] | None = Field(default=None, max_length=20)
 
@@ -91,6 +110,15 @@ class RequirementUpdate(BaseModel):
 class ExtractionResult(BaseModel):
     input: RawInputOut
     requirements: list[RequirementOut]
+
+
+class MergeRequest(BaseModel):
+    target_id: int
+
+
+class MergeResult(BaseModel):
+    merged: RequirementOut
+    target: RequirementOut
 
 
 class LatentNeedsResult(BaseModel):

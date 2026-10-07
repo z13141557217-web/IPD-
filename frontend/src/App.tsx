@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type AppealsDimension,
+  type ClassificationRules,
   type Health,
   type Project,
   type RawInput,
@@ -10,14 +11,16 @@ import {
   type RequirementPatch,
   type RequirementStatus,
 } from "./api";
-import QuestionList from "./QuestionList";
+import DispositionView from "./DispositionView";
+import QuestionList, { type Probe } from "./QuestionList";
 import RequirementRow from "./RequirementRow";
 
-const SOURCE_TYPES = ["客户反馈", "访谈记录", "会议纪要", "销售反馈", "其他"];
+const SOURCE_TYPES = ["客户", "销售或市场", "内部部门", "行业标准或法规", "其他"];
 const STATUS_TABS: { key: RequirementStatus | "all"; label: string }[] = [
   { key: "draft", label: "待确认" },
   { key: "confirmed", label: "已确认" },
   { key: "rejected", label: "已否决" },
+  { key: "merged", label: "已合并" },
   { key: "all", label: "全部" },
 ];
 type Scope = "all" | "stated" | "latent" | "strategic" | "project";
@@ -28,7 +31,9 @@ const SCOPES: { key: Scope; label: string }[] = [
   { key: "strategic", label: "长期需求" },
   { key: "project", label: "单次项目需求" },
 ];
-type View = "list" | "questions";
+type View = "list" | "questions" | "dispositions";
+// 盲区提示至少要有这么多条需求才出现，太少时说“没有”没有意义。
+const MIN_FOR_BLIND_SPOTS = 3;
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : "发生未知错误";
@@ -40,9 +45,15 @@ function inScope(r: Requirement, scope: Scope): boolean {
   return r.demand_type === scope;
 }
 
+/** 类别筛选的 key：功能、设计约束、未定各一个，质量属性按具体方面分。 */
+function categoryKeyOf(r: Requirement): string {
+  return r.category === "quality" ? `quality:${r.subcategory ?? ""}` : r.category;
+}
+
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [dimensions, setDimensions] = useState<AppealsDimension[]>([]);
+  const [rules, setRules] = useState<ClassificationRules | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
@@ -53,13 +64,14 @@ export default function App() {
   const [newProjectName, setNewProjectName] = useState("");
   const [content, setContent] = useState("");
   const [sourceType, setSourceType] = useState(SOURCE_TYPES[0]);
+  const [requester, setRequester] = useState("");
   const [busy, setBusy] = useState<null | "extract" | "latent">(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [view, setView] = useState<View>("list");
   const [statusFilter, setStatusFilter] = useState<RequirementStatus | "all">("draft");
-  const [appealsFilter, setAppealsFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>("all");
 
   const [editingBackground, setEditingBackground] = useState(false);
@@ -72,10 +84,11 @@ export default function App() {
   activeProjectRef.current = projectId;
 
   useEffect(() => {
-    Promise.all([api.health(), api.appeals(), api.listProjects()])
-      .then(([h, rules, ps]) => {
+    Promise.all([api.health(), api.appeals(), api.classification(), api.listProjects()])
+      .then(([h, appeals, classification, ps]) => {
         setHealth(h);
-        setDimensions(rules.dimensions);
+        setDimensions(appeals.dimensions);
+        setRules(classification);
         setProjects(ps);
         if (ps.length > 0) setProjectId(ps[0].id);
       })
@@ -97,7 +110,7 @@ export default function App() {
     setEditingBackground(false);
     setView("list");
     setStatusFilter("draft");
-    setAppealsFilter(null);
+    setCategoryFilter(null);
     setScope("all");
     if (projectId === null) return;
     const id = projectId;
@@ -121,23 +134,28 @@ export default function App() {
     }
   }
 
-  async function saveBackground() {
-    if (!project) return;
+  async function patchProject(patch: Parameters<typeof api.updateProject>[1]) {
+    if (!project) return false;
     setError(null);
     try {
-      const updated = await api.updateProject(project.id, { description: backgroundDraft });
+      const updated = await api.updateProject(project.id, patch);
       setProjects((ps) => ps.map((p) => (p.id === updated.id ? updated : p)));
-      setEditingBackground(false);
+      return true;
     } catch (err) {
       setError(messageOf(err));
+      return false;
     }
+  }
+
+  async function saveBackground() {
+    if (await patchProject({ description: backgroundDraft })) setEditingBackground(false);
   }
 
   function showResults(ids: number[]) {
     setFreshIds(new Set(ids));
     setView("list");
     setStatusFilter("draft");
-    setAppealsFilter(null);
+    setCategoryFilter(null);
   }
 
   async function runExtraction(run: () => ReturnType<typeof api.submitInput>, onSuccess?: () => void) {
@@ -171,8 +189,12 @@ export default function App() {
     e?.preventDefault();
     if (projectId === null || !content.trim() || busy) return;
     void runExtraction(
-      () => api.submitInput(projectId, content, sourceType),
-      () => setContent(""),
+      () => api.submitInput(projectId, content, sourceType, requester),
+      () => {
+        setContent("");
+        // 提出者不沿用到下一份材料，免得张冠李戴。
+        setRequester("");
+      },
     );
   }
 
@@ -208,48 +230,104 @@ export default function App() {
     setError(null);
     try {
       const updated = await api.updateRequirement(id, patch);
-      setRequirements((rs) => rs.map((r) => (r.id === id ? updated : r)));
+      // 取消合并会改变目标需求的“几处提到”，这种情况整体重新加载。
+      if ("status" in patch && projectId !== null) await loadProjectData(projectId);
+      else setRequirements((rs) => rs.map((r) => (r.id === id ? updated : r)));
     } catch (err) {
       setError(messageOf(err));
     }
   }
 
-  const active = useMemo(() => requirements.filter((r) => r.status !== "rejected"), [requirements]);
+  async function mergeRequirement(id: number, targetId: number) {
+    setError(null);
+    try {
+      const { merged, target } = await api.mergeRequirement(id, targetId);
+      setRequirements((rs) =>
+        rs.map((r) => (r.id === merged.id ? merged : r.id === target.id ? target : r)),
+      );
+      setNotice(`已并入 #${target.id}，现在共 ${target.mention_count} 处提到这件事。`);
+    } catch (err) {
+      setError(messageOf(err));
+    }
+  }
 
-  // 下一步该做什么：三个数字都来自现有数据，点一下直接跳到对应的内容。
+  // 仍然有效的需求：没有被否决，也没有并入别的需求。
+  const active = useMemo(
+    () => requirements.filter((r) => r.status !== "rejected" && r.status !== "merged"),
+    [requirements],
+  );
+
+  // 类别覆盖：功能、每个质量属性、设计约束各有多少条。
+  const coverage = useMemo(() => {
+    if (!rules) return [];
+    const count = (key: string) => active.filter((r) => categoryKeyOf(r) === key).length;
+    const chips = [
+      { key: "functional", name: "功能", count: count("functional"), quality: false },
+      ...rules.quality_attributes.map((q) => ({
+        key: `quality:${q.key}`,
+        name: q.name,
+        count: count(`quality:${q.key}`),
+        quality: true,
+      })),
+      { key: "constraint", name: "设计约束", count: count("constraint"), quality: false },
+    ];
+    const unknown = active.filter((r) => r.category === "unknown" || categoryKeyOf(r) === "quality:").length;
+    return unknown > 0 ? [...chips, { key: "unknown", name: "类别未定", count: unknown, quality: false }] : chips;
+  }, [rules, active]);
+
+  // 还没问到的方面：一条需求都没有、用户也没说过“客户不在意”的质量属性和约束。
+  const probes = useMemo<Probe[]>(() => {
+    if (!rules || !project || active.length < MIN_FOR_BLIND_SPOTS) return [];
+    const dismissed = new Set(project.dismissed_probes);
+    const has = (key: string) => active.some((r) => categoryKeyOf(r) === key);
+    const list: Probe[] = rules.quality_attributes
+      .filter((q) => !has(`quality:${q.key}`) && !dismissed.has(q.key))
+      .map((q) => ({ key: q.key, name: q.name, question: q.probe }));
+    if (!has("constraint") && !dismissed.has("constraint")) {
+      list.push({ key: "constraint", name: "设计约束", question: rules.constraint_probe });
+    }
+    return list;
+  }, [rules, project, active]);
+
+  // 下一步该做什么：数字都来自现有数据，点一下直接跳到对应的内容。
   const todo = useMemo(
     () => ({
       confirm: requirements.filter(
         (r) => r.status === "draft" && !(r.kind === "latent" && r.validation_status !== "validated"),
       ).length,
-      ask: active.reduce((sum, r) => sum + r.open_questions.length, 0),
+      ask: active.reduce((sum, r) => sum + r.open_questions.length, 0) + probes.length,
       validate: requirements.filter(
         (r) => r.kind === "latent" && r.status === "draft" && r.validation_status === "unverified",
       ).length,
     }),
-    [requirements, active],
+    [requirements, active, probes],
   );
-
-  // 每个维度上有多少条未否决的需求；一条都没有的维度可能是盲区。
-  const coverage = useMemo(
-    () => dimensions.map((d) => ({ ...d, count: active.filter((r) => r.appeals === d.key).length })),
-    [dimensions, active],
-  );
-  const blindSpots = coverage.filter((d) => d.count === 0);
+  const confirmedCount = requirements.filter((r) => r.status === "confirmed").length;
 
   const scoped = requirements.filter(
-    (r) => inScope(r, scope) && (appealsFilter === null || r.appeals === appealsFilter),
+    (r) =>
+      inScope(r, scope) &&
+      (categoryFilter === null ||
+        (categoryFilter === "unknown"
+          ? r.category === "unknown" || categoryKeyOf(r) === "quality:"
+          : categoryKeyOf(r) === categoryFilter)),
   );
-  const visible = scoped.filter((r) => statusFilter === "all" || r.status === statusFilter);
+  const visible = scoped.filter((r) =>
+    statusFilter === "all" ? r.status !== "merged" : r.status === statusFilter,
+  );
   const countByStatus = (key: RequirementStatus | "all") =>
-    key === "all" ? scoped.length : scoped.filter((r) => r.status === key).length;
+    key === "all"
+      ? scoped.filter((r) => r.status !== "merged").length
+      : scoped.filter((r) => r.status === key).length;
 
   function jump(next: { status: RequirementStatus | "all"; scope: Scope }) {
     setView("list");
     setStatusFilter(next.status);
     setScope(next.scope);
-    setAppealsFilter(null);
+    setCategoryFilter(null);
   }
+
+  const blindNames = probes.filter((p) => p.key !== "constraint").map((p) => p.name);
 
   return (
     <div className="layout">
@@ -378,7 +456,7 @@ export default function App() {
                   value={content}
                   rows={5}
                   maxLength={50000}
-                  placeholder="把客户反馈、访谈记录或会议纪要粘贴到这里。"
+                  placeholder="把客户反馈、访谈记录、会议纪要或内部提的需求粘贴到这里。"
                   aria-label="原始材料"
                   onChange={(e) => setContent(e.target.value)}
                   onKeyDown={(e) => {
@@ -387,13 +465,21 @@ export default function App() {
                 />
                 <div className="form-foot">
                   <label className="inline">
-                    来源
+                    来自
                     <select value={sourceType} onChange={(e) => setSourceType(e.target.value)}>
                       {SOURCE_TYPES.map((s) => (
                         <option key={s}>{s}</option>
                       ))}
                     </select>
                   </label>
+                  <input
+                    className="requester"
+                    value={requester}
+                    maxLength={100}
+                    placeholder="客户名称或提出人，可不填"
+                    aria-label="提出者"
+                    onChange={(e) => setRequester(e.target.value)}
+                  />
                   <span className="muted hint">Ctrl 或 ⌘ + Enter 提交</span>
                   <button className="btn btn-primary" disabled={busy !== null || !content.trim()}>
                     {busy === "extract" ? "正在分析…" : "分析需求"}
@@ -455,6 +541,14 @@ export default function App() {
                     >
                       追问清单{todo.ask > 0 ? ` ${todo.ask}` : ""}
                     </button>
+                    <button
+                      role="tab"
+                      aria-selected={view === "dispositions"}
+                      className={view === "dispositions" ? "view active" : "view"}
+                      onClick={() => setView("dispositions")}
+                    >
+                      去向{confirmedCount > 0 ? ` ${confirmedCount}` : ""}
+                    </button>
                   </div>
                   <button
                     className="btn"
@@ -466,49 +560,60 @@ export default function App() {
                   </button>
                 </div>
 
-                {view === "questions" ? (
+                {view === "questions" && (
                   <QuestionList
                     projectName={project.name}
                     requirements={requirements}
+                    probes={probes}
                     onUpdate={updateRequirement}
+                    onDismissProbe={(key) =>
+                      void patchProject({ dismissed_probes: [...project.dismissed_probes, key] })
+                    }
                   />
-                ) : (
+                )}
+                {view === "dispositions" && (
+                  <DispositionView projectName={project.name} requirements={requirements} rules={rules} />
+                )}
+                {view === "list" && (
                   <>
                     <div className="coverage">
-                      <div className="chips" role="group" aria-label="按维度筛选">
-                        {coverage.map((d) => (
+                      <div className="chips" role="group" aria-label="按需求类别筛选">
+                        {coverage.map((c) => (
                           <button
-                            key={d.key}
-                            title={d.description}
-                            aria-pressed={appealsFilter === d.key}
-                            className={`chip${d.count === 0 ? " chip-empty" : ""}${appealsFilter === d.key ? " chip-on" : ""}`}
-                            onClick={() => setAppealsFilter(appealsFilter === d.key ? null : d.key)}
+                            key={c.key}
+                            aria-pressed={categoryFilter === c.key}
+                            className={`chip${c.count === 0 && c.quality ? " chip-empty" : ""}${categoryFilter === c.key ? " chip-on" : ""}`}
+                            onClick={() => setCategoryFilter(categoryFilter === c.key ? null : c.key)}
                           >
-                            {d.name} {d.count}
+                            {c.name} {c.count}
                           </button>
                         ))}
                       </div>
-                      {blindSpots.length > 0 && active.length >= 3 && (
+                      {blindNames.length > 0 && (
                         <p className="blind">
-                          {blindSpots.map((d) => d.name).join("、")}
-                          方面还没有任何需求。是客户不在意，还是没有问到？
+                          {blindNames.join("、")}方面还没有任何需求。
+                          <button type="button" className="link" onClick={() => setView("questions")}>
+                            追问清单里备好了对应的问题
+                          </button>
                         </p>
                       )}
                     </div>
 
                     <div className="list-controls">
                       <div className="tabs" role="tablist" aria-label="按状态筛选">
-                        {STATUS_TABS.map((t) => (
-                          <button
-                            key={t.key}
-                            role="tab"
-                            aria-selected={statusFilter === t.key}
-                            className={statusFilter === t.key ? "tab active" : "tab"}
-                            onClick={() => setStatusFilter(t.key)}
-                          >
-                            {t.label} {countByStatus(t.key)}
-                          </button>
-                        ))}
+                        {STATUS_TABS.filter((t) => t.key !== "merged" || countByStatus("merged") > 0).map(
+                          (t) => (
+                            <button
+                              key={t.key}
+                              role="tab"
+                              aria-selected={statusFilter === t.key}
+                              className={statusFilter === t.key ? "tab active" : "tab"}
+                              onClick={() => setStatusFilter(t.key)}
+                            >
+                              {t.label} {countByStatus(t.key)}
+                            </button>
+                          ),
+                        )}
                       </div>
                       <select
                         value={scope}
@@ -532,8 +637,10 @@ export default function App() {
                             key={r.id}
                             requirement={r}
                             dimensions={dimensions}
+                            rules={rules}
                             defaultOpen={freshIds.has(r.id)}
                             onUpdate={updateRequirement}
+                            onMerge={mergeRequirement}
                           />
                         ))}
                       </div>
