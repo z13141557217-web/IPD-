@@ -267,3 +267,34 @@ def test_project_can_dismiss_probes(client):
     resp = client.patch(f"/api/projects/{pid}", json={"dismissed_probes": ["security", "constraint"]})
     assert resp.json()["dismissed_probes"] == ["security", "constraint"]
     assert resp.json()["name"] == "测试产品"
+
+
+def test_delete_project_removes_everything_under_it(client):
+    keep = _project(client)
+    client.post(f"/api/projects/{keep}/inputs", json={"content": MATERIAL})
+    doomed = _project(client)
+    client.post(f"/api/projects/{doomed}/inputs", json={"content": MATERIAL})
+    client.post(f"/api/projects/{doomed}/inputs", json={"content": "安装说明书看不懂。"})
+
+    assert client.delete(f"/api/projects/{doomed}").status_code == 204
+    assert [p["id"] for p in client.get("/api/projects").json()] == [keep]
+    for path in ("requirements", "inputs", "llm-calls"):
+        assert client.get(f"/api/projects/{doomed}/{path}").status_code == 404
+    # 另一个项目不受影响
+    assert len(client.get(f"/api/projects/{keep}/requirements").json()) == 2
+    assert len(client.get(f"/api/projects/{keep}/inputs").json()) == 1
+    assert len(client.get(f"/api/projects/{keep}/llm-calls").json()) == 1
+    assert client.delete(f"/api/projects/{doomed}").status_code == 404
+
+
+def test_deleted_project_leaves_no_rows_behind(client, session_factory):
+    from sqlalchemy import func, select
+
+    from app.models import LLMCall, RawInput, Requirement
+
+    pid = _project(client)
+    client.post(f"/api/projects/{pid}/inputs", json={"content": MATERIAL})
+    client.delete(f"/api/projects/{pid}")
+    with session_factory() as db:
+        for model in (Requirement, RawInput, LLMCall):
+            assert db.scalar(select(func.count()).select_from(model)) == 0

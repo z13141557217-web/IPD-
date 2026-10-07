@@ -973,6 +973,47 @@ textarea {
   color: var(--muted);
 }
 
+/* ---- 项目改名与删除 ---- */
+
+.project-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+
+.project-tools {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rename input {
+  flex: 1 1 240px;
+  min-width: 0;
+  font-size: 18px;
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.btn-danger {
+  border-color: var(--bad);
+  background: var(--bad);
+  color: var(--on-accent);
+}
+
 /* ---- 窄屏 ---- */
 
 @media (max-width: 760px) {

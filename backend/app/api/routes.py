@@ -2,7 +2,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app import schemas
@@ -172,6 +172,18 @@ def update_project(
     db.commit()
     db.refresh(project)
     return project
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+def delete_project(project_id: int, db: Session = Depends(get_db)) -> None:
+    """删除项目，连同它的材料、需求和模型调用记录。无法恢复。"""
+    project: Project = _get_or_404(db, Project, project_id, "项目")
+    # 逐张表显式删除，不依赖数据库的级联设置，在任何数据库上行为都一样。
+    db.execute(delete(Requirement).where(Requirement.project_id == project_id))
+    db.execute(delete(RawInput).where(RawInput.project_id == project_id))
+    db.execute(delete(LLMCall).where(LLMCall.project_id == project_id))
+    db.delete(project)
+    db.commit()
 
 
 # ---- 原始材料与提取 ----

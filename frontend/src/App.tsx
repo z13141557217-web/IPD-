@@ -78,6 +78,10 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>("all");
 
+  const [creating, setCreating] = useState(false);
+  // 项目标题旁的操作：改名、删除（删除要在页面上再确认一次）
+  const [projectAction, setProjectAction] = useState<null | "rename" | "delete" | "deleting">(null);
+  const [nameDraft, setNameDraft] = useState("");
   const [editingBackground, setEditingBackground] = useState(false);
   const [backgroundDraft, setBackgroundDraft] = useState("");
 
@@ -112,6 +116,7 @@ export default function App() {
     setFreshIds(new Set());
     setNotice(null);
     setEditingBackground(false);
+    setProjectAction(null);
     setView("list");
     setStatusFilter("draft");
     setCategoryFilter(null);
@@ -126,15 +131,43 @@ export default function App() {
   async function createProject(e: React.FormEvent) {
     e.preventDefault();
     const name = newProjectName.trim();
-    if (!name) return;
+    // 创建过程中不接受第二次点击，否则会建出重复的项目。
+    if (!name || creating) return;
     setError(null);
+    setCreating(true);
     try {
       const created = await api.createProject(name);
-      setProjects((ps) => [created, ...ps]);
+      setProjects((ps) => [created, ...ps.filter((p) => p.id !== created.id)]);
       setProjectId(created.id);
+      setPage("work");
       setNewProjectName("");
     } catch (err) {
       setError(messageOf(err));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function renameProject(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nameDraft.trim()) return;
+    if (await patchProject({ name: nameDraft })) setProjectAction(null);
+  }
+
+  async function deleteProject() {
+    if (!project) return;
+    const doomed = project;
+    setError(null);
+    setProjectAction("deleting");
+    try {
+      await api.deleteProject(doomed.id);
+      const rest = projects.filter((p) => p.id !== doomed.id);
+      setProjects(rest);
+      setProjectId(rest.length > 0 ? rest[0].id : null);
+      setNotice(null);
+    } catch (err) {
+      setError(messageOf(err));
+      setProjectAction(null);
     }
   }
 
@@ -364,8 +397,8 @@ export default function App() {
             aria-label="新项目名称"
             onChange={(e) => setNewProjectName(e.target.value)}
           />
-          <button className="btn" disabled={!newProjectName.trim()}>
-            新建
+          <button className="btn" disabled={!newProjectName.trim() || creating}>
+            {creating ? "创建中…" : "新建"}
           </button>
         </form>
         <div className="side-foot">
@@ -415,7 +448,70 @@ export default function App() {
         ) : (
           <>
             <header className="project-head">
-              <h2>{project.name}</h2>
+              {projectAction === "rename" ? (
+                <form className="rename" onSubmit={renameProject}>
+                  <input
+                    autoFocus
+                    value={nameDraft}
+                    maxLength={200}
+                    aria-label="项目名称"
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === "Escape" && setProjectAction(null)}
+                  />
+                  <button className="btn btn-primary" disabled={!nameDraft.trim()}>
+                    保存
+                  </button>
+                  <button type="button" className="btn" onClick={() => setProjectAction(null)}>
+                    取消
+                  </button>
+                </form>
+              ) : (
+                <div className="project-title">
+                  <h2>{project.name}</h2>
+                  {projectAction === null && (
+                    <span className="project-tools">
+                      <button
+                        type="button"
+                        className="link"
+                        onClick={() => {
+                          setNameDraft(project.name);
+                          setProjectAction("rename");
+                        }}
+                      >
+                        改名
+                      </button>
+                      <button type="button" className="link" onClick={() => setProjectAction("delete")}>
+                        删除项目
+                      </button>
+                    </span>
+                  )}
+                </div>
+              )}
+              {(projectAction === "delete" || projectAction === "deleting") && (
+                <div className="banner banner-error confirm" role="alertdialog" aria-label="确认删除项目">
+                  <span>
+                    删除“{project.name}”
+                    {requirements.length > 0 ? `，以及其中的 ${requirements.length} 条需求和全部材料` : ""}
+                    ？删除后无法恢复。
+                  </span>
+                  <span className="actions">
+                    <button
+                      className="btn btn-danger"
+                      disabled={projectAction === "deleting"}
+                      onClick={() => void deleteProject()}
+                    >
+                      {projectAction === "deleting" ? "正在删除…" : "确认删除"}
+                    </button>
+                    <button
+                      className="btn"
+                      disabled={projectAction === "deleting"}
+                      onClick={() => setProjectAction(null)}
+                    >
+                      取消
+                    </button>
+                  </span>
+                </div>
+              )}
               {editingBackground ? (
                 <div className="background-edit">
                   <textarea

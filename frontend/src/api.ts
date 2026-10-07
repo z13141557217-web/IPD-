@@ -179,6 +179,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new Error(detail);
   }
+  // 204 表示成功但没有内容（例如删除）。
+  if (resp.status === 204) return undefined as T;
   return resp.json() as Promise<T>;
 }
 
@@ -198,6 +200,7 @@ const realApi = {
     patch: Partial<Pick<Project, "name" | "description" | "dismissed_probes">>,
   ) =>
     request<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deleteProject: (id: number) => request<void>(`/projects/${id}`, { method: "DELETE" }),
   listRequirements: (projectId: number) =>
     request<Requirement[]>(`/projects/${projectId}/requirements`),
   listInputs: (projectId: number) => request<RawInput[]>(`/projects/${projectId}/inputs`),
