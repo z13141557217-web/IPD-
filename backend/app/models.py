@@ -111,6 +111,16 @@ class Requirement(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class AppSetting(Base):
+    """界面上保存的设置，一行一项。"""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class LLMCall(Base):
     """每一次模型调用的完整记录，用于核对依据和回归对比。"""
 

@@ -1,0 +1,176 @@
+{
+  "appeals": {
+    "version": 1,
+    "dimensions": [
+      {
+        "key": "price",
+        "code": "$",
+        "name": "价格",
+        "description": "客户为产品或服务付出的购买价格，包括定价方式、折扣、付款条件。"
+      },
+      {
+        "key": "availability",
+        "code": "A",
+        "name": "可获得性",
+        "description": "客户能否方便、及时地买到和拿到产品，包括渠道、交期、供货稳定性。"
+      },
+      {
+        "key": "packaging",
+        "code": "P",
+        "name": "包装",
+        "description": "产品的外观、形态、尺寸、配置组合、交付形式等客户直接看到的呈现。"
+      },
+      {
+        "key": "performance",
+        "code": "P",
+        "name": "性能",
+        "description": "产品的功能与性能指标，如速度、容量、精度、功能是否满足使用场景。"
+      },
+      {
+        "key": "ease_of_use",
+        "code": "E",
+        "name": "易用性",
+        "description": "安装、学习、操作、维护是否简单，包括界面、文档、上手成本。"
+      },
+      {
+        "key": "assurances",
+        "code": "A",
+        "name": "保证",
+        "description": "可靠性、安全性、质量、售后服务与响应等让客户放心的承诺。"
+      },
+      {
+        "key": "lifecycle_cost",
+        "code": "L",
+        "name": "生命周期成本",
+        "description": "购买之后的全部成本，包括安装、能耗、耗材、维护、升级、报废处置。"
+      },
+      {
+        "key": "social_acceptance",
+        "code": "S",
+        "name": "社会接受程度",
+        "description": "品牌口碑、行业认证、法规符合性、环保与社会责任等外部认可。"
+      }
+    ],
+    "priorities": [
+      {
+        "key": "high",
+        "name": "高"
+      },
+      {
+        "key": "medium",
+        "name": "中"
+      },
+      {
+        "key": "low",
+        "name": "低"
+      }
+    ]
+  },
+  "classification": {
+    "version": 1,
+    "categories": [
+      {
+        "key": "functional",
+        "name": "功能",
+        "description": "产品要能做什么事。"
+      },
+      {
+        "key": "quality",
+        "name": "质量属性",
+        "description": "产品把事情做到多好。功能有了但“不好用”，问题通常出在这里。"
+      },
+      {
+        "key": "constraint",
+        "name": "设计约束",
+        "description": "方案必须遵守的限制，不由设计者自由决定。"
+      }
+    ],
+    "quality_attributes": [
+      {
+        "key": "performance",
+        "name": "性能",
+        "description": "响应速度、处理能力、容量等要达到什么水平。",
+        "probe": "日常使用中，哪些操作让您觉得慢或者不够用？做到什么程度才算够？"
+      },
+      {
+        "key": "reliability",
+        "name": "可靠性",
+        "description": "长时间使用和遇到异常情况时是否稳定。",
+        "probe": "产品出过哪些故障？出故障时对您的影响有多大，能接受多久恢复？"
+      },
+      {
+        "key": "security",
+        "name": "安全性",
+        "description": "数据、权限以及人身和财产安全方面的要求。",
+        "probe": "在数据、权限或人身财产安全方面，您最担心什么？有没有必须满足的要求？"
+      },
+      {
+        "key": "maintainability",
+        "name": "可维护性",
+        "description": "安装、维修、升级和日常保养是否方便，包括可安装性和可服务性。",
+        "probe": "安装、维修、升级分别由谁来做？哪一步最费事？"
+      },
+      {
+        "key": "scalability",
+        "name": "可扩展性",
+        "description": "用量、规模或使用范围增长后是否还能用。",
+        "probe": "未来一两年，用量、规模或使用范围会怎么变化？现在的产品跟得上吗？"
+      },
+      {
+        "key": "portability",
+        "name": "可移植性",
+        "description": "能否在不同的环境、平台或配套设备上使用。",
+        "probe": "产品需要和哪些现有的系统、设备或环境配合？换一个环境还要能用吗？"
+      }
+    ],
+    "constraints": [
+      {
+        "key": "environment",
+        "name": "环境要求"
+      },
+      {
+        "key": "standards",
+        "name": "标准与规范"
+      },
+      {
+        "key": "regulations",
+        "name": "政策与法规"
+      },
+      {
+        "key": "technical",
+        "name": "技术限制"
+      },
+      {
+        "key": "customer_specific",
+        "name": "客户的特殊要求"
+      },
+      {
+        "key": "customer_skills",
+        "name": "客户的使用能力"
+      }
+    ],
+    "constraint_probe": "有没有必须遵守的标准、法规、使用环境，或者现有条件上的限制？",
+    "dispositions": [
+      {
+        "key": "current",
+        "name": "当前版本",
+        "description": "紧急且有价值，纳入正在开发的版本，尽快交付。"
+      },
+      {
+        "key": "next",
+        "name": "后续版本",
+        "description": "中期需求，纳入产品规划，下一次立项时考虑。"
+      },
+      {
+        "key": "tech",
+        "name": "技术规划",
+        "description": "需要提前做技术储备或平台能力的中长期需求。"
+      },
+      {
+        "key": "long",
+        "name": "长期跟踪",
+        "description": "方向性的长期需求，持续观察，暂不安排。"
+      }
+    ]
+  }
+}

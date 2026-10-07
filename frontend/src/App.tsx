@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   api,
+  IS_DEMO,
   type AppealsDimension,
   type ClassificationRules,
   type Health,
@@ -14,6 +15,7 @@ import {
 import DispositionView from "./DispositionView";
 import QuestionList, { type Probe } from "./QuestionList";
 import RequirementRow from "./RequirementRow";
+import SettingsPage from "./SettingsPage";
 
 const SOURCE_TYPES = ["客户", "销售或市场", "内部部门", "行业标准或法规", "其他"];
 const STATUS_TABS: { key: RequirementStatus | "all"; label: string }[] = [
@@ -69,6 +71,7 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [page, setPage] = useState<"work" | "settings">("work");
   const [view, setView] = useState<View>("list");
   const [statusFilter, setStatusFilter] = useState<RequirementStatus | "all">("draft");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -338,9 +341,12 @@ export default function App() {
           {projects.map((p) => (
             <li key={p.id}>
               <button
-                className={p.id === projectId ? "project active" : "project"}
-                aria-current={p.id === projectId}
-                onClick={() => setProjectId(p.id)}
+                className={p.id === projectId && page === "work" ? "project active" : "project"}
+                aria-current={p.id === projectId && page === "work"}
+                onClick={() => {
+                  setProjectId(p.id);
+                  setPage("work");
+                }}
               >
                 {p.name}
               </button>
@@ -360,26 +366,44 @@ export default function App() {
             新建
           </button>
         </form>
-        {health && (
-          <p className="model-info">
-            模型：{health.demo_mode ? "未接入（演示模式）" : health.llm_model || health.llm_provider}
-          </p>
-        )}
+        <div className="side-foot">
+          <button
+            className={page === "settings" ? "project active" : "project"}
+            aria-current={page === "settings"}
+            onClick={() => setPage(page === "settings" ? "work" : "settings")}
+          >
+            设置
+          </button>
+          {health && (
+            <p className="model-info">
+              模型：{health.demo_mode ? "未接入（演示模式）" : health.llm_model || health.llm_provider}
+              <br />
+              版本 {health.version}
+            </p>
+          )}
+        </div>
       </aside>
 
       <main className="main">
-        {health?.demo_mode && (
+        {IS_DEMO && (
+          <div className="banner banner-warn" role="status">
+            这是界面预览版：数据是示例，保存在这个页面里，刷新后恢复原样；其中的分析内容是手写的示例，不是模型的输出。
+          </div>
+        )}
+        {health?.demo_mode && !IS_DEMO && page === "work" && (
           <div className="banner banner-warn" role="status">
             演示模式：没有接入大模型，只按标点拆句、按关键词归类，不做任何分析。接入模型后结果才有参考价值。
           </div>
         )}
-        {error && (
+        {error && page === "work" && (
           <div className="banner banner-error" role="alert">
             {error}
           </div>
         )}
 
-        {project === null ? (
+        {page === "settings" ? (
+          <SettingsPage onSaved={() => void api.health().then(setHealth).catch(() => undefined)} />
+        ) : project === null ? (
           <p className="empty">在左侧新建或选择一个项目。</p>
         ) : (
           <>

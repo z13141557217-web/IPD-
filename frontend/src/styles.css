@@ -21,12 +21,67 @@
   --warn-bg: #fbf0d9;
   --bad: #b02a20;
   --bad-bg: #fae6e3;
+  /* 深色块（“下一步”栏、选中的筛选、非功能需求标签）的底色和上面的字色 */
+  --strong-bg: #18212b;
+  --strong-hover: #24313e;
+  --strong-sep: #33404d;
+  --strong-fg: #ffffff;
+  --on-accent: #ffffff;
   --radius: 6px;
   font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
   font-size: 15px;
   line-height: 1.65;
   color: var(--ink);
+}
+
+/* 深色主题：只重新定义颜色变量，组件样式不变 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161c;
+    --surface: #1a2129;
+    --ink: #e6ebf0;
+    --muted: #9aa6b2;
+    --line: #2e3945;
+    --accent: #6cb4ee;
+    --inferred: #b7a2e0;
+    --inferred-bg: #241f33;
+    --ok: #6cc08b;
+    --ok-bg: #16301f;
+    --warn: #e0a84a;
+    --warn-bg: #33270f;
+    --bad: #f08a80;
+    --bad-bg: #3a1a17;
+    --strong-bg: #2b3847;
+    --strong-hover: #354456;
+    --strong-sep: #1a2129;
+    --strong-fg: #ffffff;
+    --on-accent: #0b1520;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #11161c;
+  --surface: #1a2129;
+  --ink: #e6ebf0;
+  --muted: #9aa6b2;
+  --line: #2e3945;
+  --accent: #6cb4ee;
+  --inferred: #b7a2e0;
+  --inferred-bg: #241f33;
+  --ok: #6cc08b;
+  --ok-bg: #16301f;
+  --warn: #e0a84a;
+  --warn-bg: #33270f;
+  --bad: #f08a80;
+  --bad-bg: #3a1a17;
+  --strong-bg: #2b3847;
+  --strong-hover: #354456;
+  --strong-sep: #1a2129;
+  --strong-fg: #ffffff;
+  --on-accent: #0b1520;
+  color-scheme: dark;
 }
 
 * {
@@ -36,6 +91,10 @@
 body {
   margin: 0;
   background: var(--bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 h1,
@@ -209,12 +268,13 @@ textarea {
 .btn-primary {
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .btn-primary:hover:not(:disabled) {
-  border-color: var(--ink);
-  background: var(--ink);
+  border-color: var(--strong-bg);
+  background: var(--strong-bg);
+  color: var(--strong-fg);
 }
 
 .link {
@@ -291,25 +351,25 @@ textarea {
   gap: 1px;
   overflow: hidden;
   border-radius: var(--radius);
-  background: #33404d;
+  background: var(--strong-sep);
 }
 
 .todo button {
   flex: 1 1 200px;
   padding: 14px 18px;
   border: none;
-  background: var(--ink);
-  color: #fff;
+  background: var(--strong-bg);
+  color: var(--strong-fg);
   text-align: left;
 }
 
 .todo button:hover {
-  background: #24313e;
+  background: var(--strong-hover);
 }
 
 .todo button:focus-visible {
   outline-offset: -3px;
-  outline-color: #fff;
+  outline-color: var(--strong-fg);
 }
 
 .todo strong {
@@ -323,8 +383,8 @@ textarea {
 .todo-clear {
   flex: 1;
   padding: 12px 18px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--strong-bg);
+  color: var(--strong-fg);
   font-size: 14px;
 }
 
@@ -446,9 +506,9 @@ textarea {
 
 .chip-on {
   border-style: solid;
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #fff;
+  border-color: var(--strong-bg);
+  background: var(--strong-bg);
+  color: var(--strong-fg);
 }
 
 .blind {
@@ -798,9 +858,9 @@ textarea {
 
 /* 非功能需求的标签：用实心底，在一排标签里最先被看到 */
 .tag-cat {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #fff;
+  border-color: var(--strong-bg);
+  background: var(--strong-bg);
+  color: var(--strong-fg);
 }
 
 .classification {
@@ -840,6 +900,77 @@ textarea {
 
 .question-group .row-tags {
   flex: none;
+}
+
+/* ---- 设置页 ---- */
+
+.side-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.side-foot .model-info {
+  margin-top: 0;
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+}
+
+.settings h2 {
+  font-size: 22px;
+}
+
+.settings h3 {
+  font-size: 16px;
+}
+
+.settings form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.setting input,
+.setting select {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.setting small {
+  font-size: 12px;
+}
+
+.test-ok {
+  color: var(--ok);
+}
+
+.test-bad {
+  color: var(--bad);
+}
+
+.about {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  font-size: 14px;
+}
+
+.about dt {
+  color: var(--muted);
 }
 
 /* ---- 窄屏 ---- */

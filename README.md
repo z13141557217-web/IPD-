@@ -42,7 +42,14 @@ cp .env.example .env      # 然后编辑 .env，至少填写 POSTGRES_PASSWORD
 docker compose up -d --build
 ```
 
-浏览器打开 <http://localhost:8080>。
+浏览器打开 <http://localhost:8080>。第一次构建需要几分钟。
+
+以后更新到新版本：
+
+```bash
+git pull
+docker compose up -d --build     # 会自动执行数据库迁移
+```
 
 ### 本地开发
 
@@ -66,18 +73,32 @@ npm run dev               # 打开 http://localhost:5173
 
 ## 接入大模型
 
-默认是**演示模式**（`LLM_PROVIDER=mock`）：不调用任何模型，只按标点拆句、按关键词归类，用来跑通流程，结果没有参考价值。需求分析和潜在需求发现都依赖模型的推理能力，演示模式下不会有分析内容。
+第一次启动时是**演示模式**：不调用任何模型，只按标点拆句、按关键词归类，用来跑通流程，结果没有参考价值。需求分析和潜在需求发现都依赖模型的推理能力，演示模式下不会有分析内容。
 
-接入真实模型时，在 `.env` 中设置：
+接入真实模型：打开界面左下角的**设置**，在“模型接入”里选择“OpenAI 兼容接口”，填写接口地址、模型名称和密钥，保存后点“测试连接”。保存后立即生效，不需要重启。
 
+- 接口地址填到 `/v1` 这一级。程序调用的是 `POST {接口地址}/chat/completions`。
+- 私有化部署时把接口地址指向内网的推理服务即可，本地服务没有密钥时可以留空。
+- 也可以在 `.env` 里用 `LLM_PROVIDER`、`LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 预置。设置页保存过之后，以设置页的为准。
+- 接口格式不同的模型服务需要在 `backend/app/llm/providers.py` 里新增一个提供方。
+
+关于密钥：它保存在这套程序自己的数据库里，保存后界面和接口都不再显示完整内容，调用记录里也不包含。目前程序**没有登录功能**，能打开页面的人都能改设置，所以不要把它直接暴露在公网上。
+
+## 界面预览
+
+不想先部署就看界面时，可以构建一个预览版：一个不连后端、带示例数据的静态页面。
+
+```bash
+python3 scripts/build_preview.py     # 产物在 frontend/dist-preview/
 ```
-LLM_PROVIDER=openai_compatible
-LLM_BASE_URL=模型服务地址，填到 /v1 这一级
-LLM_API_KEY=密钥
-LLM_MODEL=模型名称
-```
 
-应用调用的是 OpenAI Chat Completions 格式的接口（`POST {LLM_BASE_URL}/chat/completions`）。私有化部署时把 `LLM_BASE_URL` 指向内网的推理服务即可。接口格式不同的模型服务需要在 `backend/app/llm/providers.py` 里新增一个提供方。
+预览版里的分析内容是手写的示例，新录入的材料只会按句子拆开；数据保存在页面里，刷新后恢复原样。
+
+## 版本与更新记录
+
+- 当前版本见 `VERSION`，界面左下角和设置页也会显示。
+- 每个版本的变化见 [CHANGELOG.md](CHANGELOG.md)。
+- 分支、提交和发布的约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 目录结构
 
@@ -93,7 +114,12 @@ LLM_MODEL=模型名称
 │   ├── alembic/          # 数据库迁移脚本
 │   └── tests/
 ├── frontend/             # React + TypeScript 界面
+├── scripts/              # 导出规则、构建预览版
 ├── docs/                 # 需求、设计与决策记录
+├── .github/workflows/    # 持续集成、自动打版本标签
+├── CHANGELOG.md          # 更新日志
+├── CONTRIBUTING.md       # 开发与版本管理约定
+├── VERSION               # 当前版本号
 └── docker-compose.yml
 ```
 
@@ -123,4 +149,4 @@ LLM_MODEL=模型名称
 
 ## 尚未实现
 
-登录与权限、多用户、文件上传（目前只能粘贴文字）、向量检索、与外部系统的集成。数据表中的 `owner` / `created_by` 字段目前固定为 `local`。
+登录与权限、多用户、手动新增需求（目前需求只能由分析材料产生）、文件上传（目前只能粘贴文字）、向量检索、与外部系统的集成。数据表中的 `owner` / `created_by` 字段目前固定为 `local`。

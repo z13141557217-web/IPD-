@@ -1,3 +1,4 @@
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,13 +8,15 @@ from sqlalchemy.orm import Session
 from app import schemas
 from app.config import get_settings
 from app.db import get_db
-from app.llm.gateway import LLMGateway, get_gateway
+from app.llm.gateway import LLMGateway, build_provider, get_gateway
 from app.models import LLMCall, Project, RawInput, Requirement
 from app.rules import appeals_keys, load_appeals, load_classification, subcategory_keys
 from app.llm.providers import LLMError
 from app.services.extraction import extract_requirements
 from app.services.latent import NotEnoughRequirements, discover_latent_needs
 from app.services.parsing import ModelOutputError
+from app.services.settings import LLMConfig, get_llm_config, key_hint, save_llm_config
+from app.version import __version__
 
 router = APIRouter(prefix="/api")
 
@@ -26,14 +29,69 @@ def _get_or_404(db: Session, model: type, obj_id: int, label: str) -> Any:
 
 
 @router.get("/health", response_model=schemas.HealthOut)
-def health() -> schemas.HealthOut:
-    settings = get_settings()
-    demo = settings.llm_provider == "mock"
+def health(db: Session = Depends(get_db)) -> schemas.HealthOut:
+    config = get_llm_config(db)
+    demo = config.provider == "mock"
     return schemas.HealthOut(
+        version=__version__,
         status="ok",
-        llm_provider=settings.llm_provider,
-        llm_model="" if demo else settings.llm_model,
+        llm_provider=config.provider,
+        llm_model="" if demo else config.model,
         demo_mode=demo,
+    )
+
+
+# ---- 设置 ----
+
+
+def _llm_settings_out(config: LLMConfig) -> schemas.LLMSettingsOut:
+    return schemas.LLMSettingsOut(
+        provider=config.provider,
+        base_url=config.base_url,
+        model=config.model,
+        api_key_set=bool(config.api_key),
+        api_key_hint=key_hint(config.api_key),
+        source=config.source,
+    )
+
+
+@router.get("/settings", response_model=schemas.SettingsOut)
+def get_app_settings(db: Session = Depends(get_db)) -> schemas.SettingsOut:
+    return schemas.SettingsOut(version=__version__, llm=_llm_settings_out(get_llm_config(db)))
+
+
+@router.put("/settings/llm", response_model=schemas.LLMSettingsOut)
+def update_llm_settings(
+    body: schemas.LLMSettingsUpdate, db: Session = Depends(get_db)
+) -> schemas.LLMSettingsOut:
+    if body.provider == "openai_compatible":
+        if not body.base_url.strip().lower().startswith(("http://", "https://")):
+            raise HTTPException(status_code=422, detail="接口地址要以 http:// 或 https:// 开头")
+        if not body.model.strip():
+            raise HTTPException(status_code=422, detail="请填写模型名称")
+    config = save_llm_config(
+        db, provider=body.provider, base_url=body.base_url, model=body.model, api_key=body.api_key
+    )
+    return _llm_settings_out(config)
+
+
+@router.post("/settings/llm/test", response_model=schemas.LLMTestResult)
+def test_llm_settings(db: Session = Depends(get_db)) -> schemas.LLMTestResult:
+    """用当前保存的配置向模型发一句话，确认地址、密钥和模型名称都对。"""
+    config = get_llm_config(db)
+    if config.provider == "mock":
+        return schemas.LLMTestResult(ok=True, latency_ms=0, message="演示模式不调用模型，无需测试。")
+    started = time.monotonic()
+    try:
+        reply = build_provider(config).complete("你在做连通性测试。", "请只回复两个字：正常")
+    except LLMError as exc:
+        return schemas.LLMTestResult(
+            ok=False, latency_ms=int((time.monotonic() - started) * 1000), message=str(exc)
+        )
+    return schemas.LLMTestResult(
+        ok=True,
+        latency_ms=int((time.monotonic() - started) * 1000),
+        message=f"连接成功，模型回复：{reply.strip()[:50]}",
     )
 
 
