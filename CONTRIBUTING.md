@@ -38,6 +38,7 @@ cd backend
 .venv/bin/alembic check          # 数据表定义与迁移脚本一致
 
 cd ../frontend
+npm test                         # 在线版与后端的一致性测试
 npm run build                    # 类型检查并构建
 ```
 
@@ -46,6 +47,6 @@ npm run build                    # 类型检查并构建
 ## 改动时要保持的约定
 
 - 改了数据表定义：用 `alembic revision --autogenerate -m "说明"` 生成迁移脚本，不手工改库。
-- 改了提示词：同步修改对应文件里的 `PROMPT_VERSION`，这样调用记录能分清是哪一版提示词的结果。
-- 改了 `backend/app/rules/*.yaml`：运行 `backend/.venv/bin/python scripts/export_rules.py`，更新前端预览版用的规则副本。
-- 改了界面：运行 `python3 scripts/build_preview.py` 重新生成预览版。
+- 改了提示词（`backend/app/rules/prompts.yaml`）：把对应的 `version` 加一，这样调用记录能分清是哪一版提示词的结果。
+- 改了 `backend/app/rules/*.yaml`，或者后端拼提示词、解析模型输出的逻辑：运行 `backend/.venv/bin/python scripts/export_rules.py`，更新在线版用的副本和对照样例；然后在 `frontend/src/core/analysis.ts` 里做同样的修改，直到 `npm test` 通过。
+- 改了界面或在线版的逻辑：运行 `python3 scripts/build_page.py hosted` 重新生成在线版并发布。

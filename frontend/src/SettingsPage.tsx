@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { api, type AppSettings, type LLMSettings, type LLMTestResult } from "./api";
+import { api, type AppSettings, type LLMTestResult } from "./api";
 
 interface Props {
   /** 保存成功后通知外层刷新“当前用的是哪个模型” */
@@ -13,7 +13,7 @@ function messageOf(err: unknown): string {
 
 export default function SettingsPage({ onSaved }: Props) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [provider, setProvider] = useState<LLMSettings["provider"]>("mock");
+  const [provider, setProvider] = useState<"mock" | "openai_compatible">("mock");
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
   // 密钥输入框始终从空开始：留空表示不改，后端不会把已保存的密钥发回来。
@@ -25,7 +25,7 @@ export default function SettingsPage({ onSaved }: Props) {
 
   function apply(next: AppSettings) {
     setSettings(next);
-    setProvider(next.llm.provider);
+    setProvider(next.llm.provider === "openai_compatible" ? "openai_compatible" : "mock");
     setBaseUrl(next.llm.base_url);
     setModel(next.llm.model);
     setApiKey("");
@@ -72,7 +72,7 @@ export default function SettingsPage({ onSaved }: Props) {
     setError(null);
     try {
       const llm = await api.saveLlmSettings({
-        provider: settings.llm.provider,
+        provider: settings.llm.provider === "openai_compatible" ? "openai_compatible" : "mock",
         base_url: settings.llm.base_url,
         model: settings.llm.model,
         api_key: "",
@@ -105,6 +105,51 @@ export default function SettingsPage({ onSaved }: Props) {
 
   const usesModel = provider === "openai_compatible";
 
+  if (settings.llm.provider === "hosted") {
+    return (
+      <div className="settings">
+        <h2>设置</h2>
+        {error && (
+          <div className="banner banner-error" role="alert">
+            {error}
+          </div>
+        )}
+        <section className="panel">
+          <h3>模型</h3>
+          <p>
+            在线版由这个页面直接调用 Claude 做分析，不需要填写地址和密钥。它用的是你自己的 Claude
+            账号用量，第一次分析时会请你确认是否允许。
+          </p>
+          <div className="actions">
+            <button className="btn" disabled={busy !== null} onClick={() => void runTest()}>
+              {busy === "test" ? "正在测试…" : "测试能否调用模型"}
+            </button>
+          </div>
+          {test && (
+            <p className={test.ok ? "test-ok" : "test-bad"} role="status">
+              {test.ok ? test.message : `调用失败：${test.message}`}
+              {test.latency_ms > 0 && `（耗时 ${(test.latency_ms / 1000).toFixed(1)} 秒）`}
+            </p>
+          )}
+        </section>
+        <section className="panel">
+          <h3>数据保存在哪里</h3>
+          <p>
+            项目、材料、需求和每一次模型调用的记录，都保存在这个页面自带的存储里，刷新或换设备后仍然在。
+            这个页面默认只有你能打开；如果你把它分享给别人，对方也能看到这些数据。
+          </p>
+        </section>
+        <section className="panel">
+          <h3>关于</h3>
+          <dl className="about">
+            <dt>版本</dt>
+            <dd>{settings.version}</dd>
+          </dl>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="settings">
       <h2>设置</h2>
@@ -127,7 +172,7 @@ export default function SettingsPage({ onSaved }: Props) {
             <select
               id="llm-provider"
               value={provider}
-              onChange={(e) => setProvider(e.target.value as LLMSettings["provider"])}
+              onChange={(e) => setProvider(e.target.value as typeof provider)}
             >
               <option value="mock">演示模式（不调用模型）</option>
               <option value="openai_compatible">OpenAI 兼容接口</option>

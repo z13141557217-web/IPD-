@@ -1,4 +1,5 @@
-import { demoApi } from "./demo/demoApi";
+import { createDemoApi } from "./demo/demoApi";
+import { createHostedApi } from "./hosted/hostedApi";
 
 export type Priority = "high" | "medium" | "low";
 export type RequirementStatus = "draft" | "confirmed" | "rejected" | "merged";
@@ -11,7 +12,8 @@ export type ValidationStatus = "unverified" | "validated" | "invalidated";
 export type DemandType = "strategic" | "project" | "unknown";
 
 export interface LLMSettings {
-  provider: "mock" | "openai_compatible";
+  /** hosted：在线版，由页面直接调用 Claude，不需要配置 */
+  provider: "mock" | "openai_compatible" | "hosted";
   base_url: string;
   model: string;
   /** 密钥本身不会从后端返回，只知道有没有，以及末四位 */
@@ -27,7 +29,7 @@ export interface AppSettings {
 }
 
 export interface LLMSettingsUpdate {
-  provider: LLMSettings["provider"];
+  provider: "mock" | "openai_compatible";
   base_url: string;
   model: string;
   /** null：保留原来的密钥；空字符串：清除 */
@@ -46,6 +48,8 @@ export interface Health {
   llm_provider: string;
   llm_model: string;
   demo_mode: boolean;
+  /** 需要让使用者知道的运行状况，例如数据暂时无法保存 */
+  warning?: string;
 }
 
 export interface Project {
@@ -217,7 +221,14 @@ const realApi = {
 
 export type Api = typeof realApi;
 
-/** 预览版：不连后端，数据在浏览器内存里，用于让人直接点开看界面。 */
-export const IS_DEMO = import.meta.env.VITE_DEMO === "1";
+/**
+ * 构建方式（环境变量 VITE_MODE）：
+ * - 不设置：完整版，连接自己部署的后端。
+ * - hosted：在线版，发布在 Claude 上，数据存平台的存储，分析调用 Claude。
+ * - demo：预览版，带示例数据，不保存、不调用模型。
+ */
+// 直接和字面量比较，打包工具才能在构建时确定走哪一支，并去掉用不到的代码。
+export const IS_DEMO = import.meta.env.VITE_MODE === "demo";
+export const IS_HOSTED = import.meta.env.VITE_MODE === "hosted";
 
-export const api: Api = IS_DEMO ? demoApi : realApi;
+export const api: Api = IS_HOSTED ? createHostedApi() : IS_DEMO ? createDemoApi() : realApi;

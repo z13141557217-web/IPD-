@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   IS_DEMO,
+  IS_HOSTED,
   type AppealsDimension,
   type ClassificationRules,
   type Health,
@@ -170,7 +171,8 @@ export default function App() {
       const result = await run();
       if (activeProjectRef.current !== projectId) return;
       if (result.input.status === "failed") {
-        setError(`材料已保存，但分析失败：${result.input.error ?? "原因未知"}。可以在下方重试。`);
+        const reason = (result.input.error ?? "原因未知").replace(/[。.]+$/, "");
+        setError(`材料已保存，但分析失败：${reason}。可以在下方重试。`);
       } else {
         const n = result.requirements.length;
         setNotice(n > 0 ? `分析出 ${n} 条需求，已展开在下方，请逐条核对。` : "这份材料里没有识别出需求。");
@@ -390,6 +392,11 @@ export default function App() {
             这是界面预览版：数据是示例，保存在这个页面里，刷新后恢复原样；其中的分析内容是手写的示例，不是模型的输出。
           </div>
         )}
+        {health?.warning && (
+          <div className="banner banner-error" role="alert">
+            {health.warning}
+          </div>
+        )}
         {health?.demo_mode && !IS_DEMO && page === "work" && (
           <div className="banner banner-warn" role="status">
             演示模式：没有接入大模型，只按标点拆句、按关键词归类，不做任何分析。接入模型后结果才有参考价值。
@@ -510,6 +517,12 @@ export default function App() {
                   </button>
                 </div>
               </form>
+
+              {busy !== null && IS_HOSTED && (
+                <p className="muted" role="status">
+                  模型正在分析，通常需要十几秒到一分钟，材料长时会更久。第一次使用时请留意是否弹出了授权提示。
+                </p>
+              )}
 
               {failedInputs.length > 0 && (
                 <div className="failed">

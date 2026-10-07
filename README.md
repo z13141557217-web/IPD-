@@ -84,15 +84,17 @@ npm run dev               # 打开 http://localhost:5173
 
 关于密钥：它保存在这套程序自己的数据库里，保存后界面和接口都不再显示完整内容，调用记录里也不包含。目前程序**没有登录功能**，能打开页面的人都能改设置，所以不要把它直接暴露在公网上。
 
-## 界面预览
+## 三种运行方式
 
-不想先部署就看界面时，可以构建一个预览版：一个不连后端、带示例数据的静态页面。
+| 方式 | 数据在哪里 | 用什么模型 | 怎么得到 |
+| --- | --- | --- | --- |
+| 完整版 | 你自己部署的 PostgreSQL | 设置页里配置的模型 | 按上面的“运行”一节部署 |
+| 在线版 | 发布页面自带的存储 | Claude，由页面直接调用 | `python3 scripts/build_page.py hosted`，把 `frontend/dist-hosted/` 下的 `page.html` 和 `app.js` 发布为带存储和模型调用能力的 Claude 页面 |
+| 预览版 | 页面内存，刷新即丢 | 不调用模型 | `python3 scripts/build_page.py demo` |
 
-```bash
-python3 scripts/build_preview.py     # 产物在 frontend/dist-preview/
-```
+在线版适合自己先用起来，不用装任何东西。它和完整版用的是同一套界面、同一份提示词和规则，区别只在数据存放的位置和调用的模型。两者的数据不互通。
 
-预览版里的分析内容是手写的示例，新录入的材料只会按句子拆开；数据保存在页面里，刷新后恢复原样。
+在线版在浏览器里重新实现了“拼提示词”和“解析模型输出”，为了不和后端走样，`npm test` 会拿后端算出的标准答案逐字核对。
 
 ## 版本与更新记录
 
@@ -108,13 +110,18 @@ python3 scripts/build_preview.py     # 产物在 frontend/dist-preview/
 │   ├── app/
 │   │   ├── api/          # HTTP 接口
 │   │   ├── llm/          # 模型网关与各提供方，业务代码只通过网关调用模型
-│   │   ├── rules/        # IPD 规则数据（$APPEALS 维度等），改 YAML 即可调整
+│   │   ├── rules/        # 规则数据：$APPEALS、需求类别与去向、提示词，改 YAML 即可调整
 │   │   ├── services/     # 业务逻辑：需求提取
 │   │   └── models.py     # 数据表定义
 │   ├── alembic/          # 数据库迁移脚本
 │   └── tests/
 ├── frontend/             # React + TypeScript 界面
-├── scripts/              # 导出规则、构建预览版
+│   └── src/
+│       ├── core/         # 在线版和预览版在浏览器里的后端实现
+│       ├── hosted/       # 在线版：平台存储与模型调用
+│       ├── demo/         # 预览版：示例数据
+│       └── generated/    # 由 scripts/export_rules.py 导出，不要手改
+├── scripts/              # 导出规则与提示词、构建在线版和预览版
 ├── docs/                 # 需求、设计与决策记录
 ├── .github/workflows/    # 持续集成、自动打版本标签
 ├── CHANGELOG.md          # 更新日志

@@ -12,7 +12,8 @@ __pycache__/
 
 # 构建产物
 dist/
-dist-preview/
+dist-hosted/
+dist-demo/
 build/
 .next/
 *.egg-info/
