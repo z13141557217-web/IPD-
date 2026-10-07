@@ -29,6 +29,8 @@ export interface Persistence {
   readonly durable: boolean;
   listProjects(): Promise<Project[]>;
   saveProject(project: Project): Promise<void>;
+  /** 删除项目，连同它的材料、需求和模型调用记录。 */
+  deleteProject(projectId: number): Promise<void>;
   listInputs(projectId: number): Promise<RawInput[]>;
   getInput(id: number): Promise<RawInput | null>;
   saveInput(input: RawInput): Promise<void>;
@@ -93,6 +95,14 @@ export class MemoryPersistence implements Persistence {
   async saveProject(project: Project) {
     this.projects = [...this.projects.filter((p) => p.id !== project.id), clone(project)];
   }
+  async deleteProject(projectId: number) {
+    this.projects = this.projects.filter((p) => p.id !== projectId);
+    this.inputs = this.inputs.filter((i) => i.project_id !== projectId);
+    this.requirements = this.requirements.filter((r) => r.project_id !== projectId);
+    const kept = this.calls.filter((c) => c.project_id !== projectId);
+    this.calls.length = 0;
+    this.calls.push(...kept);
+  }
   async listInputs(projectId: number) {
     return clone(this.inputs.filter((i) => i.project_id === projectId));
   }
@@ -125,12 +135,16 @@ export class MemoryPersistence implements Persistence {
 // ---- 发布平台的文档存储 ----
 
 interface DocSnapshot {
+  id: string;
   exists: boolean;
   data(): Record<string, unknown> | undefined;
 }
 interface DocRef {
   get(): Promise<DocSnapshot>;
   set(data: Record<string, unknown>): Promise<void>;
+  delete(): Promise<void>;
+  /** 短时间的互斥锁：同一时间只有一个持有者能拿到。 */
+  acquire?(options: { holder: string; ttlMs?: number }): Promise<{ acquired: boolean }>;
 }
 interface Query {
   where(field: string, op: string, value: unknown): Query;
@@ -178,9 +192,37 @@ const plain = (value: unknown) => JSON.parse(JSON.stringify(value)) as Record<st
 // 一次最多读取的文档数，是平台允许的上限。
 const PAGE = 1000;
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export class DbPersistence implements Persistence {
   readonly durable = true;
+  // 这个页面窗口的标识，用来在多个窗口之间争用编号计数器。
+  private readonly holder = `tab-${Math.random().toString(36).slice(2)}`;
+  // 同一个窗口里的取号请求排队执行，避免连点两下拿到同一个编号。
+  private idQueue: Promise<unknown> = Promise.resolve();
+
   constructor(private db: DocStore) {}
+
+  /** 删除某个集合里属于这个项目的全部文档。一次最多读一页，删完再读，直到读不到。 */
+  private async deleteWhere(collection: string, projectId: number) {
+    for (;;) {
+      const snapshot = await guarded(() =>
+        this.db.collection(collection).where("project_id", "==", projectId).limit(PAGE).get(),
+      );
+      if (snapshot.docs.length === 0) return;
+      for (const doc of snapshot.docs) {
+        await guarded(() => this.db.doc(`${collection}/${doc.id}`).delete());
+      }
+    }
+  }
+
+  async deleteProject(projectId: number) {
+    // 先删项目下面的内容，最后删项目本身：中途失败时项目还在，可以再删一次。
+    await this.deleteWhere("requirements", projectId);
+    await this.deleteWhere("inputs", projectId);
+    await this.deleteWhere("llm_calls", projectId);
+    await guarded(() => this.db.doc(`projects/${projectId}`).delete());
+  }
 
   private async list<T>(query: Query): Promise<T[]> {
     const snapshot = await guarded(() => query.limit(PAGE).get());
@@ -219,12 +261,28 @@ export class DbPersistence implements Persistence {
       await guarded(() => this.db.doc(`requirements/${r.id}`).set(plain(r)));
     }
   }
-  async reserveIds(count: number) {
-    // 编号计数器。按“同一时间只有一个人在录入”来设计：两个人同时录入时可能拿到相同的编号。
+  reserveIds(count: number): Promise<number> {
+    // 取号必须一个一个来：读计数器、加上去、写回，中间不能被另一次取号插进来，
+    // 否则两次会拿到同一个编号，后写的会盖掉先写的。
+    const run = this.idQueue.then(() => this.reserveIdsExclusive(count));
+    this.idQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async reserveIdsExclusive(count: number): Promise<number> {
     const ref = this.db.doc("meta/counters");
+    // 不同窗口之间靠存储提供的短时锁来互斥。锁会自动过期，拿不到就稍等再试。
+    if (ref.acquire) {
+      let acquired = false;
+      for (let attempt = 0; attempt < 8 && !acquired; attempt += 1) {
+        if (attempt > 0) await sleep(400);
+        acquired = (await guarded(() => ref.acquire!({ holder: this.holder, ttlMs: 2000 }))).acquired;
+      }
+      if (!acquired) throw new Error("另一个窗口正在录入，请稍等几秒再试。");
+    }
     const snapshot = await guarded(() => ref.get());
     const first = Number(snapshot.data()?.next ?? 1);
-    await guarded(() => ref.set({ next: first + count }));
+    await guarded(() => ref.set({ ...snapshot.data(), next: first + count }));
     return first;
   }
   async logCall(call: LlmCallRecord) {

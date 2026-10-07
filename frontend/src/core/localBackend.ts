@@ -290,6 +290,13 @@ export function createLocalBackend(options: LocalBackendOptions): Api {
       return settle(project);
     },
 
+    deleteProject: async (projectId) => {
+      const store = await options.persistence();
+      await requireProject(store, projectId);
+      await store.deleteProject(projectId);
+      await settle(null);
+    },
+
     listRequirements: async (projectId) => {
       const store = await options.persistence();
       const stored = (await store.listRequirements(projectId)).sort((a, b) => b.id - a.id);
